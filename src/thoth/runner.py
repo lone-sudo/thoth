@@ -45,6 +45,12 @@ class Planner(Protocol):
     def decide(self, context: str, history: list[dict[str, Any]]) -> Plan: ...
 
 
+class PlannerUnavailable(RuntimeError):
+    """A planner cannot produce a plan — e.g. the provider ladder is empty or
+    every attempt failed. The runner parks the run: this is the degradation
+    ladder's terminal state (ADR-004 §2), never a fallback to a paid API."""
+
+
 class NoopPlanner:
     """Deterministic V0.2 planner: execute a scripted tool queue, then finish.
 
@@ -286,7 +292,10 @@ def execute_run(
         context, sizes = build_context(conn, project, goal, run_id, history)
 
         # --- plan -----------------------------------------------------------
-        plan = planner.decide(context, history)
+        try:
+            plan = planner.decide(context, history)
+        except PlannerUnavailable as exc:
+            return _park(conn, run_id, project, f"no provider: {exc}")
         if plan.done or plan.tool is None:
             _finish(conn, run_id, plan.summary or "planner finished")
             return RunResult(run_id, "done", plan.summary or "planner finished", turns_used)

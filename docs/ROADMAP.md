@@ -32,17 +32,20 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
       search (FTS over notes)
 - [x] `run.*` checkpoint events with bounds carried on resume; parked-run surfacing
       in `thoth continue`
-- [ ] Routing log schema (`task_class, provider, latency, outcome`) — collected from
-      day one, *used* in V3 *(partially: per-turn outcome recorded; provider fields
-      arrive with the first model planner)*
-- [ ] One provider, manual override; no learned routing *(blocked on model planner)*
+- [x] Routing log schema (`task_class, provider, latency, outcome`) — collected from
+      day one, *used* in V3 *(provider.route / provider.attempt / provider.outcome
+      events now emitted by the ModelPlanner; latency arrives with the first client)*
+- [ ] One provider, manual override; no learned routing *(planner exists; client
+      pending — Ollama local first, guard-gated)*
 
 ## V1 — the operating layer
 
 *Security design: **ADR-004** (choke point, spend guard, privacy floors, injection
 defense) — lands together with the provider registry, not after.*
 
-- [ ] Provider registry + availability cache + capability floors + degradation ladder
+- [x] Provider registry + availability cache + capability floors + degradation ladder
+      *(skeleton: providers declared, local-first ladder, fail-closed availability,
+      `attempt()` raises for all — no clients yet; runner parks on exhausted ladder)*
 - [ ] $0 spend guard + privacy floor at the single outbound choke point (`guard.py`,
       fail-closed, every decision an event; CI test: no provider import outside guard)
 - [ ] Permission table `{domain → level}` + typed confirmation for destructive actions

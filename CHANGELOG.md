@@ -5,6 +5,21 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 ## [Unreleased]
 
 ### Added
+- **Guard skeleton (ADR-004 implemented):** `guard.py` — fail-closed tool gate
+  (level>0 denied until the confirmation flow lands; privacy-ceiling enforcement;
+  SENSITIVE cleared to no tool), provider/network egress denied outright, every
+  verdict a `guard.decision` event; no-bypass CI scan (no network primitives or
+  provider imports outside guard.py; the guard itself performs no I/O).
+- **Provider registry + degradation ladder:** `providers.py` — the $0 invariant is
+  *structural* (a non-local provider cannot be enabled; constructible only
+  disabled), local-first route(), fail-closed availability cache (unprobed =
+  unavailable), `attempt()` raises for all providers in this build (no clients).
+- **ModelPlanner** (`planner_model.py`): the first model-backed Planner over the
+  ladder — emits `provider.route` / `provider.attempt` / `provider.outcome` (the V3
+  learned-router dataset starts here); scripted mode for tests/resume; the runner
+  catches exhausted ladders and parks with "no provider". Client pending: local
+  Ollama first, guard-gated.
+- 27 new tests (guard 12, providers/planner 15); suite at 77 passing.
 - **`thoth briefing`** (Azaris-parity track, V1 item pulled forward): morning report
   generated from stored state only — parked runs (with resume commands), open work,
   last wrap-up. ≤7 items, "Nothing needs you today." is a valid output; zero network,
