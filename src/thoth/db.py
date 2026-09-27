@@ -1,11 +1,15 @@
-"""SQLite storage layer (ADR-001). One database file, WAL, stdlib only."""
+"""SQLite storage layer (ADR-001). One database file, WAL, stdlib only.
+
+Schema migrations: numbered, append-only (the existing jarvis-era V2 line used the
+same pattern); SCHEMA_VERSION tracks the latest applied migration.
+"""
 
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -59,6 +63,60 @@ CREATE TABLE IF NOT EXISTS workdirs (
 );
 """
 
+# --- migration 2 (ADR-003 V0.2): runs index + notes FTS ---------------------
+
+_MIGRATION_2 = """
+CREATE TABLE IF NOT EXISTS runs (
+    id           TEXT PRIMARY KEY,
+    project      TEXT,
+    goal         TEXT,
+    status       TEXT NOT NULL DEFAULT 'running',
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+-- FTS over notes bodies: the AI-free retriever for the runner context package.
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    body,
+    content='notes',
+    content_rowid='rowid'
+);
+CREATE TRIGGER IF NOT EXISTS notes_fts_insert AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, body) VALUES (new.rowid, new.body);
+END;
+CREATE TRIGGER IF NOT EXISTS notes_fts_delete AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, body) VALUES ('delete', old.rowid, old.body);
+END;
+CREATE TRIGGER IF NOT EXISTS notes_fts_update AFTER UPDATE OF body, superseded_by
+    ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, body) VALUES ('delete', old.rowid, old.body);
+    INSERT INTO notes_fts(rowid, body) VALUES (new.rowid, new.body);
+END;
+"""
+
+
+def _applied_version(conn: sqlite3.Connection) -> int:
+    row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
+    return int(row["value"]) if row is not None else 0
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply pending migrations in order; stamp schema_version at the end."""
+    applied = _applied_version(conn)
+    if applied < 2:
+        conn.executescript(_MIGRATION_2)
+        # Backfill FTS for any notes created before this migration (bulk, fast).
+        conn.execute(
+            "INSERT INTO notes_fts(rowid, body) "
+            "SELECT rowid, body FROM notes WHERE superseded_by IS NULL"
+        )
+    if applied != SCHEMA_VERSION:
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('schema_version', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (str(SCHEMA_VERSION),),
+        )
+
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
     """Open (creating if needed) the Thoth database with WAL enabled."""
@@ -69,10 +127,6 @@ def connect(db_path: Path | str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_SCHEMA)
-    conn.execute(
-        "INSERT INTO meta (key, value) VALUES ('schema_version', ?) "
-        "ON CONFLICT(key) DO NOTHING",
-        (str(SCHEMA_VERSION),),
-    )
+    _migrate(conn)
     conn.commit()
     return conn

@@ -1,7 +1,8 @@
 # Thoth — personal AI operating layer
 
-> **Status: V0 — walking skeleton.** ✅ Sessions · events · notes · tasks · "where did I leave off"
-> 🚧 Runner loop (plan → act → verify → checkpoint) · routing · $0 guard · content inbox
+> **Status: V0.2 — runner loop.** ✅ Sessions · events · notes · tasks · "where did I leave off" ·
+> checkpointed runner (plan → act → verify → checkpoint) · 3 read-only tools · park/resume
+> 🚧 Model planner · routing + $0 guard · permission levels ≥1 · content inbox
 
 Six principles (ADR-001 §5): understand me · remember what I'm doing · choose the right
 intelligence/tool · act on my machines **only through declared tools with auditable
@@ -28,7 +29,18 @@ thoth stop --summary "Migrated schema; indexes pending"                  # check
 thoth continue                                                           # where did I leave off?
 thoth note add "Prefer WAL mode" --kind preference --project thoth       # atomic note
 thoth note list --kind decision                                          # active notes
+thoth run start --project thoth --goal "Audit the event log"             # create a run
+thoth run execute --project thoth                                        # drive it (NoopPlanner in V0.2)
+thoth run resume --project thoth                                         # resume a parked run (bounds carry over)
 ```
+
+**The runner (ADR-003):** each turn loads a fixed-order context package (hard
+per-section token budgets), plans, acts through *one* declared tool, verifies the
+result with deterministic code, and appends a `run.turn.*` checkpoint to the event
+log. Max-turns / tool-budget / deadline bounds are enforced by the runner — never the
+model — and travel inside the checkpoint, so a resumed run can't escape them. V0.2's
+planner is a scripted `NoopPlanner` (zero AI calls); a model planner implements the
+same `Planner` protocol without touching the loop.
 
 `task` subcommands: `add` (with `--after` for dependencies), `list`, `next`, `update`.
 `note` subcommands: `add` (kinds: fact / decision / preference / lesson), `list`.
@@ -41,7 +53,7 @@ runner loop, not before.
 ## Layout
 
 ```
-src/thoth/        paths, schema, db, events, session, resume, tasks, cli
+src/thoth/        paths, schema, db, events, session, resume, tasks, tools, runner, cli
 tests/            unit + integration (real SQLite via tmp_path)
 docs/             vision, roadmap, architecture (adrs/, reviews/, journal/)
 CHANGELOG.md

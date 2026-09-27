@@ -1,4 +1,4 @@
-"""Thoth CLI: start / stop / continue / status / log / note / task.
+"""Thoth CLI: start / stop / continue / status / log / note / task / run.
 
 Stdlib only (ADR-001). Every mutating command appends events (ADR-002).
 """
@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import db, notes, resume, session, tasks
+from . import db, notes, resume, runner, session, tasks, tools
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -74,10 +74,24 @@ def cmd_continue(args: argparse.Namespace) -> int:
     conn = _connect(args)
     try:
         info = resume.build(conn, getattr(args, "project", None))
+        # parked runs are the top of the "what was I doing?" answer (ADR-003 §4)
+        parked = runner.last_parked(conn, getattr(args, "project", None))
         if getattr(args, "json", False):
+            if parked is not None:
+                info["parked_run"] = {
+                    "id": parked["id"], "goal": parked.get("goal"),
+                    "parked_at": parked.get("updated_at"),
+                    "reason": parked.get("park_reason"),
+                    "resume_with": f"thoth run resume --project {parked['project']}"
+                    if parked.get("project") else "thoth run resume",
+                }
             print(json.dumps(info, indent=2, ensure_ascii=False))
         else:
             print(resume.render(info))
+            if parked is not None:
+                print(f"  parked run {parked['id']}: {parked.get('goal') or '(no goal)'}"
+                      f" — {parked.get('park_reason') or 'parked'}")
+                print(f"    resume with: {info.get('parked_run', {}).get('resume_with', 'thoth run resume')}")
         return 0
     finally:
         conn.close()
@@ -183,6 +197,65 @@ def cmd_note(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_run(args: argparse.Namespace) -> int:
+    conn = _connect(args)
+    try:
+        if args.run_cmd == "start":
+            sid = runner.start_run(
+                conn, args.project, args.goal,
+                max_turns=args.max_turns,
+                tool_calls_budget=args.budget,
+            )
+            print(f"run {sid} created for project '{args.project}'")
+            print("  note: V0.2 ships the NoopPlanner (no AI calls).")
+            print("  execute it with: thoth run execute")
+            return 0
+
+        if args.run_cmd == "status":
+            cur = runner.current_run(conn, args.project)
+            if cur:
+                print(f"running: {cur['id']} (project {cur['project']}, goal: {cur['goal']})")
+            else:
+                parked = runner.last_parked(conn, args.project)
+                if parked:
+                    print(f"no running run; last parked: {parked['id']} — {parked.get('park_reason')}")
+                else:
+                    print("no active or parked runs")
+            return 0
+
+        if args.run_cmd == "execute":
+            cur = runner.current_run(conn, args.project)
+            if cur is None:
+                print("no running run (create one with: thoth run start)", file=sys.stderr)
+                return 1
+            registry = tools.default_registry()
+            planner = runner.NoopPlanner(script=[])
+            result = runner.execute_run(conn, cur["id"], planner, registry,
+                                        max_turns=args.max_turns,
+                                        tool_calls_budget=args.budget)
+            print(f"run {result.run_id}: {result.status} ({result.reason})")
+            return 0 if result.status == "done" else 1
+
+        if args.run_cmd == "resume":
+            registry = tools.default_registry()
+
+            def planner_factory(goal: str, history: list[dict]) -> runner.Planner:
+                print(f"resuming with scripted planner (goal: {goal or 'n/a'}); "
+                      "V0.2 has no model planner — run will park again unless scripted.")
+                return runner.NoopPlanner(script=[])
+
+            result = runner.resume_run(conn, args.project, planner_factory, registry,
+                                       max_turns=args.max_turns,
+                                       tool_calls_budget=args.budget)
+            print(f"run {result.run_id}: {result.status} ({result.reason})")
+            return 0 if result.status == "done" else 1
+
+        print("unknown run subcommand", file=sys.stderr)
+        return 2
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
@@ -251,6 +324,32 @@ def build_parser() -> argparse.ArgumentParser:
     tsp.add_argument("id")
     tsp.add_argument("status", choices=["todo", "doing", "done"])
     tsp.set_defaults(func=cmd_task)
+
+    rp = sub.add_parser("run", help="runner loop (ADR-003): create/status/execute/resume runs")
+    rsub = rp.add_subparsers(dest="run_cmd", required=True)
+
+    rsp = rsub.add_parser("start", help="create a run with a goal")
+    rsp.add_argument("--project")
+    rsp.add_argument("--goal", required=True)
+    rsp.add_argument("--max-turns", type=int, default=25)
+    rsp.add_argument("--budget", type=int, default=20, help="tool-call budget")
+    rsp.set_defaults(func=cmd_run)
+
+    rsp = rsub.add_parser("status", help="show current/parked run")
+    rsp.add_argument("--project")
+    rsp.set_defaults(func=cmd_run)
+
+    rsp = rsub.add_parser("execute", help="drive the current run (NoopPlanner in V0.2)")
+    rsp.add_argument("--project")
+    rsp.add_argument("--max-turns", type=int, default=25)
+    rsp.add_argument("--budget", type=int, default=20)
+    rsp.set_defaults(func=cmd_run)
+
+    rsp = rsub.add_parser("resume", help="resume the last parked run (bounds carry over)")
+    rsp.add_argument("--project")
+    rsp.add_argument("--max-turns", type=int, default=25)
+    rsp.add_argument("--budget", type=int, default=20)
+    rsp.set_defaults(func=cmd_run)
 
     return p
 

@@ -18,14 +18,18 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
 
 ## V0.2 — the runner loop
 
-*Design: **ADR-003** (pre-merge draft — build after the Team-B merge review).*
+*Design: **ADR-003** (pre-merge draft — built as skeleton; merge review may refine).*
 
-- [ ] Checkpointed loop: load context package → plan → act via one tool → verify →
+- [x] Checkpointed loop: load context package → plan → act via one tool → verify →
       checkpoint → repeat; "resume after crash" and "continue" = same code path
-- [ ] 3 tools, read-only: shell (domain-scoped), files (workspace-scoped), memory CRUD
+- [x] 3 tools, read-only: shell (allowlist-scoped), files (workspace-scoped), memory
+      search (FTS over notes)
+- [x] `run.*` checkpoint events with bounds carried on resume; parked-run surfacing
+      in `thoth continue`
 - [ ] Routing log schema (`task_class, provider, latency, outcome`) — collected from
-      day one, *used* in V3
-- [ ] One provider, manual override; no learned routing
+      day one, *used* in V3 *(partially: per-turn outcome recorded; provider fields
+      arrive with the first model planner)*
+- [ ] One provider, manual override; no learned routing *(blocked on model planner)*
 
 ## V1 — the operating layer
 

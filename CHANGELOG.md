@@ -5,6 +5,21 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 ## [Unreleased]
 
 ### Added
+- **V0.2 runner loop (ADR-003 implemented):**
+  - `runs` table + notes FTS5 with sync triggers and backfill (schema migration v2)
+  - Tool protocol: `ToolSpec` registry with schema validation, permission levels,
+    idempotency flags, and per-tool deterministic verifiers
+  - Three read-only (level 0) tools: `shell.read` (allowlisted, chaining-blocked),
+    `file.read` (workspace-escape-proof), `memory.search` (FTS, syntax-neutralized)
+  - Runner: load context package → plan → act → verify → checkpoint per turn; hard
+    bounds (max turns, tool-call budget, deadline) enforced in code; parking on
+    budget/deadline/3× verify-fail; `resume_run` carries bounds from checkpoints
+  - Context package: five fixed sections with per-section token budgets, sizes
+    recorded in every checkpoint
+  - `Planner` Protocol with deterministic `NoopPlanner` (zero AI calls; model planner
+    plugs in without touching the loop)
+  - CLI: `thoth run start|status|execute|resume`; `thoth continue` now surfaces
+    parked runs with their resume command
 - ADR-003 (draft): runner-loop design — five-phase loop, fixed-order context package
   with per-section token budgets, declared tool protocol (permission level, idempotency
   flag, verifier), and the checkpoint-as-event format (`run.turn.*`). Pre-merge draft;
