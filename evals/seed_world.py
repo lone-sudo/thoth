@@ -68,12 +68,12 @@ def seed(tmp: Path) -> Facts:
     session.set_workdir(conn, "data-eng", "/tmp/data-eng")
 
     # ---- tasks ----------------------------------------------------------------
-    facts.rcc_task1 = tasks.add(conn, "Fix PG16 migration", project="rcc-suite")
+    facts.rcc_task1 = tasks.add(conn, "Fix PG16 migration", project="rcc-suite", deadline="2026-09-25")
     facts.rcc_task2 = tasks.add(conn, "Add beam index", project="rcc-suite",
                                 depends_on=facts.rcc_task1)
     facts.eng_task1 = tasks.add(conn, "Model airflow dags", project="data-eng")
     facts.eng_task2 = tasks.add(conn, "Backfill_fact_orders", project="data-eng",
-                                depends_on=facts.eng_task1)
+                                depends_on=facts.eng_task1, deadline="2026-09-21")
     tasks.update_status(conn, facts.eng_task1, "done")  # completes AFTER child exists
 
     # ---- notes ------------------------------------------------------------------

@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 
-from thoth import briefing, notes, resume, runner, session, tasks
+from thoth import briefing, digest, notes, resume, runner, session, tasks
 
 from .seed_world import Facts
 
@@ -221,6 +221,44 @@ def _c33(conn, f):
     return body <= 7 and ("Nothing needs you" in rendered or body > 0), f"items={body}"
 
 
+def _c34(conn, f):
+    report = digest.build(conn, "rcc-suite", today="2026-09-27")
+    flat = [i for _, items in report["sections"] for i in items]
+    return any("OVERDUE" in i and "Fix PG16 migration" in i for i in flat), str(flat[:2])
+
+
+def _c35(conn, f):
+    report = digest.build(conn, None, today="2026-09-27")
+    over = next((items for t, items in report["sections"] if "overdue" in t), [])
+    ok = (len(over) >= 2 and "Backfill_fact_orders" in over[0]
+          and "Fix PG16 migration" in over[1])
+    return ok, str(over)  # eng (09-21) sorts before rcc (09-25)
+
+
+def _c36(conn, f):
+    tasks.add(conn, "Far future", project="rcc-suite", deadline="2027-06-01")
+    report = digest.build(conn, "rcc-suite", today="2026-09-27")
+    flat = [i for _, items in report["sections"] for i in items]
+    return not any("Far future" in i for i in flat), "far-future leaked into digest"
+
+
+def _c37(conn, f):
+    tasks.update_status(conn, f.eng_task2, "done")
+    report = digest.build(conn, "data-eng", today="2026-09-27")
+    flat = [i for _, items in report["sections"] for i in items]
+    ok = any("Backfill_fact_orders" in i for i in flat)
+    tasks.update_status(conn, f.eng_task2, "todo")  # restore world (log keeps event)
+    return ok, "done-today missing from digest"
+
+
+def _c38(conn, f):
+    big = digest.build(conn, None, today="2026-09-27")
+    assert big["item_count"] <= 7, f"cap exceeded: {big['item_count']}"
+    quiet = digest.build(conn, "nonexistent", today="2026-09-27")
+    rendered = digest.render(quiet)
+    return "Quiet day" in rendered, f"{rendered!r}"
+
+
 GOLDEN: list[Check] = [
     _check("01.continue returns last rcc wrap-up summary", _c01),
     _check("02.continue finds the open thoth session", _c02),
@@ -255,4 +293,14 @@ GOLDEN: list[Check] = [
     _check("31.briefing tops parked run with own reason", _c31),
     _check("32.quiet project honestly reports nothing-needs-you", _c32),
     _check("33.briefing respects the 7-item cap", _c33),
+    _check("34.digest flags overdue rcc task", _c34),
+    _check("35.digest orders two overdue by deadline", _c35),
+    _check("36.digest upcoming window excludes far dates", _c36),
+    _check("37.digest accomplished-today from event log", _c37),
+    _check("38.digest quiet day output and cap", _c38),
 ]
+
+
+# ===========================================================================
+# G. digest (34-38) - deadline-aware end-of-day report
+# ===========================================================================

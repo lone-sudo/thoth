@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS workdirs (
 
 # --- migration 2 (ADR-003 V0.2): runs index + notes FTS ---------------------
 
+# --- migration 3: task deadlines (digest requires due-date tracking) --------
+
+_MIGRATION_3 = """
+ALTER TABLE tasks ADD COLUMN deadline TEXT;
+"""
+
 _MIGRATION_2 = """
 CREATE TABLE IF NOT EXISTS runs (
     id           TEXT PRIMARY KEY,
@@ -105,6 +111,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
     applied = _applied_version(conn)
     if applied < 2:
         conn.executescript(_MIGRATION_2)
+    if applied < 3:
+        try:
+            conn.executescript(_MIGRATION_3)
+        except Exception:
+            pass  # column exists on DBs created post-v3; idempotent
+
         # Backfill FTS for any notes created before this migration (bulk, fast).
         conn.execute(
             "INSERT INTO notes_fts(rowid, body) "

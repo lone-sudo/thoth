@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import briefing, db, notes, resume, runner, session, tasks, tools
+from . import briefing, db, digest, notes, resume, runner, session, tasks, tools
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -140,7 +140,7 @@ def cmd_task(args: argparse.Namespace) -> int:
         sub = args.task_cmd
 
         if sub == "add":
-            tid = tasks.add(conn, args.title, project=args.project, depends_on=args.after)
+            tid = tasks.add(conn, args.title, project=args.project, depends_on=args.after, deadline=args.deadline)
             print(f"task {tid} added: {args.title}" + (f" (after {args.after})" if args.after else ""))
             return 0
 
@@ -270,6 +270,21 @@ def cmd_briefing(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_digest(args: argparse.Namespace) -> int:
+    conn = _connect(args)
+    try:
+        report = digest.build(conn, getattr(args, "project", None),
+                              today=getattr(args, "today", None))
+        if getattr(args, "json", False):
+            import json
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            print(digest.render(report))
+        return 0
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
@@ -324,6 +339,7 @@ def build_parser() -> argparse.ArgumentParser:
     tsp.add_argument("title")
     tsp.add_argument("--project")
     tsp.add_argument("--after", help="task id this one depends on")
+    tsp.add_argument("--deadline", help="due date YYYY-MM-DD")
     tsp.set_defaults(func=cmd_task)
 
     tsp = tsub.add_parser("list", help="list open tasks")
@@ -369,6 +385,12 @@ def build_parser() -> argparse.ArgumentParser:
     bp.add_argument("--project")
     bp.add_argument("--json", action="store_true")
     bp.set_defaults(func=cmd_briefing)
+
+    dp = sub.add_parser("digest", help="end-of-day digest: deadlines, parked, accomplished (≤7 items)")
+    dp.add_argument("--project")
+    dp.add_argument("--today", help="override today as YYYY-MM-DD (testing)")
+    dp.add_argument("--json", action="store_true")
+    dp.set_defaults(func=cmd_digest)
 
     return p
 

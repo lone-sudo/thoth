@@ -14,8 +14,16 @@ def add(
     title: str,
     project: str | None = None,
     depends_on: str | None = None,
+    deadline: str | None = None,
 ) -> str:
+    """Create a task; deadline is an ISO date (YYYY-MM-DD), validated."""
     """Create a task. depends_on must reference an existing, not-yet-done task."""
+    if deadline is not None:
+        from datetime import date
+        try:
+            date.fromisoformat(deadline)
+        except ValueError as exc:
+            raise ValueError(f"deadline must be YYYY-MM-DD: {deadline}") from exc
     if depends_on is not None:
         dep = conn.execute("SELECT status FROM tasks WHERE id = ?", (depends_on,)).fetchone()
         if dep is None:
@@ -25,18 +33,18 @@ def add(
     task_id = uuid.uuid4().hex[:8]
     ts = now_iso()
     conn.execute(
-        "INSERT INTO tasks (id, title, project, status, depends_on, created_at, updated_at) "
-        "VALUES (?, ?, ?, 'todo', ?, ?, ?)",
-        (task_id, title, project, depends_on, ts, ts),
+        "INSERT INTO tasks (id, title, project, status, depends_on, deadline, created_at, updated_at) "
+        "VALUES (?, ?, ?, 'todo', ?, ?, ?, ?)",
+        (task_id, title, project, depends_on, deadline, ts, ts),
     )
     emit(conn, "task.added", {"id": task_id, "title": title, "project": project,
-                              "depends_on": depends_on})
+                              "depends_on": depends_on, "deadline": deadline})
     conn.commit()
     return task_id
 
 
 def list_open(conn: sqlite3.Connection, project: str | None = None) -> list[dict[str, Any]]:
-    sql = "SELECT id, title, project, status, depends_on, created_at FROM tasks WHERE status != 'done'"
+    sql = "SELECT id, title, project, status, depends_on, deadline, created_at FROM tasks WHERE status != 'done'"
     params: list[Any] = []
     if project:
         sql += " AND (project = ? OR project IS NULL)"
