@@ -4,6 +4,12 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added
+- ADR-003 (draft): runner-loop design — five-phase loop, fixed-order context package
+  with per-section token budgets, declared tool protocol (permission level, idempotency
+  flag, verifier), and the checkpoint-as-event format (`run.turn.*`). Pre-merge draft;
+  four explicit questions staged for the Team-B review.
+
 ### Changed
 - **Project renamed: Jarvis → Thoth.** Python package `jarvis` → `thoth`, CLI `jarvis`
   → `thoth`, default DB `~/.jarvis/jarvis.db` → `~/.thoth/thoth.db`. Reason: an unrelated,

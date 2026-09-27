@@ -18,6 +18,8 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
 
 ## V0.2 — the runner loop
 
+*Design: **ADR-003** (pre-merge draft — build after the Team-B merge review).*
+
 - [ ] Checkpointed loop: load context package → plan → act via one tool → verify →
       checkpoint → repeat; "resume after crash" and "continue" = same code path
 - [ ] 3 tools, read-only: shell (domain-scoped), files (workspace-scoped), memory CRUD
