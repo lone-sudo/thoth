@@ -5,6 +5,12 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 ## [Unreleased]
 
 ### Added
+- ADR-004 (draft): the security choke point — one fail-closed gate for outbound AI
+  requests, network calls, level-≥1 tool invocations, and externally-sourced memory
+  writes; $0 spend rules as unoverridable code; privacy classes traveling with data
+  (sensitive never leaves the machine); prompt-injection defense via origin tainting,
+  content-as-data rendering, no-privilege-crossing-from-tainted-input, and floors
+  that rise but never fall. Four open questions staged for the Team-B review.
 - **V0.2 runner loop (ADR-003 implemented):**
   - `runs` table + notes FTS5 with sync triggers and backfill (schema migration v2)
   - Tool protocol: `ToolSpec` registry with schema validation, permission levels,

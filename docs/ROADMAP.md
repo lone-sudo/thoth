@@ -33,8 +33,12 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
 
 ## V1 — the operating layer
 
+*Security design: **ADR-004** (choke point, spend guard, privacy floors, injection
+defense) — lands together with the provider registry, not after.*
+
 - [ ] Provider registry + availability cache + capability floors + degradation ladder
-- [ ] $0 spend guard + privacy floor at the single outbound choke point
+- [ ] $0 spend guard + privacy floor at the single outbound choke point (`guard.py`,
+      fail-closed, every decision an event; CI test: no provider import outside guard)
 - [ ] Permission table `{domain → level}` + typed confirmation for destructive actions
 - [ ] Tasks get deadlines; morning briefing + end-of-day digest (generated from stored
       state only, ≤7 items, "nothing needs you" is a valid output)
