@@ -1,9 +1,12 @@
 """The security choke point (ADR-004): one fail-closed guard for every
 consequential crossing.
 
-V1 skeleton scope: tool invocations (privacy clearance + level gate) and
-network/provider crossings (denied outright — no provider clients exist; the
-spend-guard branches land with the provider registry and are *unoverridable*).
+Egress policy (post local-branch):
+- `provider` crossings to **`local:` targets** are ALLOWED — the one planned
+  branch (ADR-004 §2). The caller module (ollama.py) owns loopback enforcement;
+  the guard owns the *decision* and its event.
+- Every other egress — cloud providers, generic network — stays DENIED: cloud
+  spend branches land with the provider registry and are unoverridable.
 
 Design invariants (ADR-004):
 - fail closed: unknown crossing / guard error => deny
@@ -33,6 +36,8 @@ DENY = "deny"
 KIND_TOOL = "tool"
 KIND_NETWORK = "network"      # any outbound network call
 KIND_PROVIDER = "provider"    # outbound AI request (subset of network)
+
+LOCAL_TARGET_PREFIX = "local:"  # e.g. "local:ollama@http://127.0.0.1:11434"
 
 # Privacy classes (ADR-004): higher = more sensitive. Default for data of
 # unknown provenance is PRIVATE (fail closed). SENSITIVE is local-only and
@@ -127,18 +132,28 @@ class Guard:
 
     def check_egress(self, kind: str, target: str,
                      data_class: int = PUBLIC) -> Decision:
-        """V1 skeleton: no network path may exist outside the future provider
-        registry. Deny is the only verdict — by construction and by test."""
+        """Egress gate. Exactly one allow-rule exists:
+
+        `provider` crossings whose target starts with ``local:`` — the local
+        model path (Ollama on loopback; the caller module enforces loopback,
+        the guard enforces the decision and logs it). Cloud providers and all
+        generic network egress stay DENIED: the spend-guard branches land with
+        the provider registry and are unoverridable (ADR-004 §2).
+        """
         if kind == KIND_PROVIDER:
+            if isinstance(target, str) and target.startswith(LOCAL_TARGET_PREFIX):
+                return self._decide(
+                    KIND_PROVIDER, ALLOW, "local-egress",
+                    "local model path: loopback enforced by the caller module",
+                    target=target, data_class=data_class)
             return self._decide(
-                KIND_PROVIDER, DENY, "no-provider-clients",
-                "no provider clients exist; spend-guard branches land with the "
-                "provider registry (unoverridable)",
+                KIND_PROVIDER, DENY, "cloud-egress-denied",
+                "cloud providers stay unreachable: $0 spend guard (unoverridable)",
                 target=target, data_class=data_class)
         if kind == KIND_NETWORK:
             return self._decide(
                 KIND_NETWORK, DENY, "egress-disabled",
-                "no network egress in V1; allowlisted fetch lands with the "
+                "no generic network egress; allowlisted fetch lands with the "
                 "content inbox (V2)",
                 target=target, data_class=data_class)
         return self._decide(

@@ -23,18 +23,20 @@ def conn(tmp_path):
 
 # ------------------------------------------------------------------ gate-first
 
-def test_probe_denied_by_stock_guard(conn):
+def test_probe_allowed_by_local_branch_then_fails_on_unreachable_server(conn):
+    """Post local-branch: the guard ALLOWS local: targets; with no Ollama
+    running the probe fails at the socket, honestly, as (False, reason)."""
     ok, reason = probe(conn)
     assert ok is False
-    assert "guard denied" in reason
+    assert "probe failed" in reason and "URLError" in reason
     events = [json.loads(r["payload_json"]) for r in conn.execute(
         "SELECT payload_json FROM events WHERE kind='guard.decision'").fetchall()]
-    assert events and events[0]["verdict"] == "deny"
-    assert events[0]["target"].startswith("local:ollama")
+    assert events and events[0]["verdict"] == "allow"
+    assert events[0]["rule"] == "local-egress"
 
 
 def test_attempt_denied_by_stock_guard(conn):
-    with pytest.raises(OllamaUnavailable, match="guard denied"):
+    with pytest.raises(OllamaUnavailable):
         ollama.attempt(conn, "plan something")
 
 

@@ -81,7 +81,7 @@ def test_guard_error_fails_closed(guard_, conn):
 
 def test_provider_egress_denied(guard_, conn):
     d = guard_.check_egress(KIND_PROVIDER, "api.openai.com")
-    assert not d.allowed and d.rule == "no-provider-clients"
+    assert not d.allowed and d.rule == "cloud-egress-denied"
 
 
 def test_network_egress_denied(guard_, conn):

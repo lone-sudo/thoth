@@ -1,16 +1,23 @@
-"""Model-backed Planner (the first real brain) over the provider ladder.
+"""Model-backed Planner over the provider ladder — now with a working local path.
 
-Implements the runner's Planner Protocol. Every decide():
-  1. routes the task_class down the degradation ladder (providers.route),
-  2. emits `provider.route` (the V3 learned-router dataset starts HERE),
-  3. attempts candidates in ladder order, emitting `provider.attempt` per try,
-  4. raises PlannerUnavailable when the ladder is empty or every attempt fails —
-     the runner catches it and parks the run ("no provider"), the ladder's
-     terminal state (Team-A §2; ADR-004 §2).
+decide() flow per turn:
+  1. route the task_class down the ladder (providers.route; local-first,
+     fail-closed availability),
+  2. emit `provider.route` (V3 learned-router dataset),
+  3. for each candidate: emit `provider.attempt`, then
+     - **local** providers go through `ollama.attempt` (guard-gated; the Guard's
+       `local:` allow-branch is what makes this legal) and the answer is parsed
+       by `ollama.plan_from_json`, then the proposed tool+args are validated
+       against the tool registry *before* becoming a Plan — the model proposes,
+       the registry disposes; malformed answers count as an unavailable attempt
+       and the ladder continues;
+     - cloud providers raise ProviderUnavailable from providers.attempt (no
+       clients, $0-structural) and are recorded honestly as unavailable;
+  4. an exhausted ladder raises PlannerUnavailable -> the runner parks ("no
+     provider") — degradation, never a paid fallback.
 
-Scripted mode: pass script=[(tool, args), ...] to return canned Plans; when the
-script is exhausted, the planner returns a done-Plan (script-exhausted) — it
-NEVER falls through to the provider ladder (same semantics as NoopPlanner).
+Scripted mode unchanged: script=[(tool, args), ...] returns canned Plans and an
+exhausted script finishes the run without touching the ladder.
 """
 
 from __future__ import annotations
@@ -18,11 +25,18 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from . import providers
+from . import ollama, providers
 from .events import emit
 from .runner import PlannerUnavailable, Plan
+from .tools import ToolRegistry
 
 DEFAULT_TASK_CLASS = "plan"
+
+# provider name -> client callable(conn, prompt) -> answer text.
+# Only local entries may appear here; the registry + guard keep cloud out.
+_CLIENTS: dict[str, Any] = {
+    "ollama-local": ollama.attempt,
+}
 
 
 class ModelPlanner:
@@ -36,6 +50,7 @@ class ModelPlanner:
         task_class: str = DEFAULT_TASK_CLASS,
         min_context: int = 0,
         script: list[tuple[str, dict[str, Any]]] | None = None,
+        tool_registry: ToolRegistry | None = None,
     ) -> None:
         self._conn = conn
         self._registry = registry or providers.default_registry()
@@ -44,6 +59,7 @@ class ModelPlanner:
         self._min_context = min_context
         self._scripted = script is not None
         self._script = list(script or [])
+        self._tools = tool_registry
 
     # -- Planner protocol ------------------------------------------------------
 
@@ -86,33 +102,73 @@ class ModelPlanner:
             })
             self._conn.commit()
             try:
-                # $0 skeleton: raises for every provider; a guard-gated local
-                # client replaces providers.attempt's body later — this loop,
-                # the ladder, and the parking semantics stay identical.
-                response = providers.attempt(spec)
+                answer = self._attempt(spec, context)
+                plan_dict = ollama.plan_from_json(answer)
+                plan = self._to_plan(plan_dict, spec)
             except providers.ProviderUnavailable as exc:
                 failures.append(f"{spec.name}: {exc}")
-                emit(self._conn, "provider.outcome", {
-                    "task_class": self._task_class,
-                    "provider": spec.name,
-                    "outcome": "unavailable",
-                    "reason": str(exc),
-                })
-                self._conn.commit()
+                self._outcome(spec, "unavailable", str(exc))
                 continue
-            # (future) parse response into a Plan — the only new code a working
-            # client requires beyond attempt()'s body.
-            return self._plan_from_response(spec, response)
+            except ollama.OllamaUnavailable as exc:
+                failures.append(f"{spec.name}: {exc}")
+                self._outcome(spec, "error", str(exc))
+                continue
+            self._outcome(spec, "ok", plan_dict.get("summary", ""))
+            return plan
 
         raise PlannerUnavailable(
             f"all {len(candidates)} candidate(s) unavailable for "
             f"'{self._task_class}': " + "; ".join(failures))
 
-    # -- response → Plan (future client path) -----------------------------------
+    # -- pieces ------------------------------------------------------------------
 
-    def _plan_from_response(self, spec: providers.ProviderSpec, response: str) -> Plan:
-        """V1 skeleton: no response can exist yet. Kept as the explicit seam so
-        the future JSON-plan parse lands in exactly one place."""
-        raise PlannerUnavailable(
-            f"provider '{spec.name}' returned a response but plan parsing is "
-            "not implemented in this build")
+    def _attempt(self, spec: providers.ProviderSpec, context: str) -> str:
+        """One model call for one ladder candidate. Cloud providers raise
+        ProviderUnavailable (no clients, $0-structural); the local provider goes
+        through the guard-gated ollama client."""
+        if spec.is_local:
+            client = _CLIENTS.get(spec.name)
+            if client is None:
+                raise providers.ProviderUnavailable(
+                    f"local provider '{spec.name}' has no client registered")
+            prompt = self._build_prompt(context)
+            return client(self._conn, prompt)
+        return providers.attempt(spec)  # cloud: raises, honestly
+
+    def _build_prompt(self, context: str) -> str:
+        tool_lines = []
+        if self._tools is not None:
+            for spec in self._tools.all():
+                tool_lines.append(f"- {spec.name}: {spec.description}")
+        tools_block = "\n".join(tool_lines) if tool_lines else "- (tool list unavailable)"
+        return ("CONTEXT:\n" + context + "\n\nTOOL LIST:\n" + tools_block +
+                "\n\nDecide the next single action. Reply with the JSON plan only.")
+
+    def _to_plan(self, plan_dict: dict[str, Any],
+                 spec: providers.ProviderSpec) -> Plan:
+        """JSON dict -> runner.Plan. The registry validates tool + args: a model
+        proposal is a *suggestion* until the registry accepts it (ADR-003 §3)."""
+        tool = plan_dict.get("tool")
+        if plan_dict.get("done") or tool is None:
+            return Plan(tool=None, done=True,
+                        summary=plan_dict.get("summary", "planner finished"),
+                        next_intent=plan_dict.get("next_intent", ""))
+        if self._tools is None:
+            raise ollama.OllamaUnavailable("no tool registry wired into the planner")
+        try:
+            clean_args = self._tools.validate(tool, plan_dict.get("args", {}))
+        except (KeyError, ValueError) as exc:
+            raise ollama.OllamaUnavailable(
+                f"model proposed an invalid action ({exc})") from exc
+        return Plan(tool=tool, args=clean_args,
+                    summary=plan_dict.get("summary", ""),
+                    next_intent=plan_dict.get("next_intent", ""))
+
+    def _outcome(self, spec: providers.ProviderSpec, outcome: str, reason: str) -> None:
+        emit(self._conn, "provider.outcome", {
+            "task_class": self._task_class,
+            "provider": spec.name,
+            "outcome": outcome,
+            "reason": reason[:300],
+        })
+        self._conn.commit()
