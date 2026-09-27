@@ -104,8 +104,11 @@ def test_every_decision_is_one_event(guard_, conn):
 # ------------------------------------------------------------------ CI no-bypass
 
 def _project_src() -> list[Path]:
+    """Every module that must contain no network primitives. Exactly two files
+    may: guard.py (the gate) and ollama.py (the one I/O module it gates)."""
     root = Path(__file__).resolve().parents[1] / "src" / "thoth"
-    return [p for p in root.rglob("*.py") if p.name != "guard.py"]
+    allowed = {"guard.py", "ollama.py"}
+    return [p for p in root.rglob("*.py") if p.name not in allowed]
 
 
 def test_no_network_primitives_outside_guard():
