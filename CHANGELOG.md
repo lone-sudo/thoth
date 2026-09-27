@@ -5,6 +5,12 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 ## [Unreleased]
 
 ### Added
+- **Golden-set eval harness** (V0 gate): deterministic seed world (two projects,
+  fixed timestamps, known sessions/tasks/notes/runs) + 30 stored-state questions
+  that continue/status/run must answer from the DB alone, zero AI calls.
+  `python -m evals.run_golden` for a scoreboard; also wired into pytest. Fixing the
+  harness surfaced and fixed a real bug: `last_parked` correlated park events to
+  the latest overall instead of the run's own event.
 - ADR-004 (draft): the security choke point — one fail-closed gate for outbound AI
   requests, network calls, level-≥1 tool invocations, and externally-sourced memory
   writes; $0 spend rules as unoverridable code; privacy classes traveling with data

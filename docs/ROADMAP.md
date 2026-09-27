@@ -11,7 +11,8 @@ overturn stays unbuilt until the merge lands.**
 - [x] Read-only git snapshot in `continue` (branch, dirty files, last commit, stashes)
 - [x] Notes store (facts / decisions / preferences / lessons; supersede, never delete)
 - [x] ADR-001 (monolith, SQLite, CLI, stdlib-only), ADR-002 (events → derived views)
-- [ ] Golden-set eval harness (30 stored-state questions answered from the DB only)
+- [x] Golden-set eval harness (30 stored-state questions answered from the DB only —
+      `python -m evals.run_golden`, also wired into pytest)
 
 **Milestone test:** tell Thoth what you're working on, close the laptop, come back in
 two days, run `thoth continue` — it reconstructs where you were. Zero AI calls.

@@ -187,9 +187,16 @@ def current_run(conn: sqlite3.Connection, project: str | None = None) -> dict[st
 
 
 def last_parked(conn: sqlite3.Connection, project: str | None = None) -> dict[str, Any] | None:
+    """Most recently parked run for a project, with its own park event payload.
+
+    The park-event subquery is correlated to the run (not merely the latest park
+    event overall) so per-project answers stay truthful when several projects
+    have parked runs.
+    """
     sql = ("SELECT r.*, "
-           "(SELECT payload_json FROM events WHERE kind = 'run.parked' "
-           " ORDER BY ts DESC LIMIT 1) AS park_payload "
+           "(SELECT e.payload_json FROM events e WHERE e.kind = 'run.parked' "
+           " AND json_extract(e.payload_json, '$.run_id') = r.id "
+           " ORDER BY e.ts DESC LIMIT 1) AS park_payload "
            "FROM runs r WHERE r.status = 'parked'")
     params: list[Any] = []
     if project:
