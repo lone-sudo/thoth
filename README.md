@@ -1,8 +1,9 @@
 # Thoth — personal AI operating layer
 
-> **Status: V0.2 — runner loop.** ✅ Sessions · events · notes · tasks · "where did I leave off" ·
-> checkpointed runner (plan → act → verify → checkpoint) · 3 read-only tools · park/resume
-> 🚧 Model planner · routing + $0 guard · permission levels ≥1 · content inbox
+> **Status: V0.2 — runner loop + briefing.** ✅ Sessions · events · notes · tasks · "where did I leave off" ·
+> checkpointed runner (plan → act → verify → checkpoint) · 3 read-only tools · park/resume ·
+> morning briefing (stored state, ≤7 items, "Nothing needs you today." is valid)
+> 🚧 Model planner · routing + $0 guard · permission levels ≥1 · Telegram surface (V1.5) · content inbox
 
 Six principles (ADR-001 §5): understand me · remember what I'm doing · choose the right
 intelligence/tool · act on my machines **only through declared tools with auditable
@@ -32,6 +33,8 @@ thoth note list --kind decision                                          # activ
 thoth run start --project thoth --goal "Audit the event log"             # create a run
 thoth run execute --project thoth                                        # drive it (NoopPlanner in V0.2)
 thoth run resume --project thoth                                         # resume a parked run (bounds carry over)
+thoth briefing                                                           # morning report from stored state (≤7 items)
+thoth briefing --project data-eng                                        # scoped briefing; parked runs first
 ```
 
 **The runner (ADR-003):** each turn loads a fixed-order context package (hard

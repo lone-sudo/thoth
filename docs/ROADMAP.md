@@ -3,6 +3,11 @@
 Sequencing rule: **build the invariant core first; anything the Team-B merge could
 overturn stays unbuilt until the merge lands.**
 
+Parity track (see `docs/reviews/azaris-benchmark.md`): ~80–85% of Azaris-class
+capability is reachable at $0. Pulled forward: **overnight briefing (V1, now)**,
+**Telegram surface (V1.5, free Bot API, no new permissions)**, **email triage
+(V2, Gmail read-only via official API, guard-tainted ingestion)**.
+
 ## V0 — walking skeleton (now)
 
 - [x] Sessions: `thoth start / stop / continue / status`
@@ -41,8 +46,12 @@ defense) — lands together with the provider registry, not after.*
 - [ ] $0 spend guard + privacy floor at the single outbound choke point (`guard.py`,
       fail-closed, every decision an event; CI test: no provider import outside guard)
 - [ ] Permission table `{domain → level}` + typed confirmation for destructive actions
-- [ ] Tasks get deadlines; morning briefing + end-of-day digest (generated from stored
-      state only, ≤7 items, "nothing needs you" is a valid output)
+- [x] Morning briefing (`thoth briefing`): generated from stored state only, ≤7
+      items, "nothing needs you" is a valid output, parked runs top-of-list with
+      resume commands (parity track item 1; Azaris-benchmark)
+- [ ] Tasks get deadlines; end-of-day digest + weekly review
+- [ ] Telegram surface (V1.5): Bot API briefing delivery + approval cards wired to
+      `guard.require_confirmation`; grants no new permissions
 - [ ] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches)
 
 ## V2 — memory + content

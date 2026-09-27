@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 
-from thoth import notes, resume, runner, session, tasks
+from thoth import briefing, notes, resume, runner, session, tasks
 
 from .seed_world import Facts
 
@@ -197,6 +197,30 @@ def _c30(conn, f):
     return len(turns) == 1 and turns[0]["run_id"] == f.done_run, f"{len(turns)} turns"
 
 
+# ===========================================================================
+# F. briefing (31–33) — Azaris-parity track, pulled forward
+# ===========================================================================
+
+def _c31(conn, f):
+    report = briefing.build(conn, "data-eng")
+    # parked data-eng run must top the briefing, with its own reason traceable
+    parked = runner.last_parked(conn, "data-eng")
+    ok = (parked is not None and parked["id"] == f.parked_run
+          and parked.get("park_reason") == f.parked_reason)
+    return ok and report["needs_you"], f"parked={parked and parked['id']}"
+
+def _c32(conn, f):
+    report = briefing.build(conn, "thoth")
+    rendered = briefing.render(report)
+    return "Nothing needs you today." in rendered, f"{rendered!r}"
+
+def _c33(conn, f):
+    report = briefing.build(conn, None)
+    rendered = briefing.render(report)
+    body = sum(len(items) for _, items in report["sections"])
+    return body <= 7 and ("Nothing needs you" in rendered or body > 0), f"items={body}"
+
+
 GOLDEN: list[Check] = [
     _check("01.continue returns last rcc wrap-up summary", _c01),
     _check("02.continue finds the open thoth session", _c02),
@@ -228,4 +252,7 @@ GOLDEN: list[Check] = [
     _check("28.no running run", _c28),
     _check("29.done run checkpoint intact", _c29),
     _check("30.run history scoped to its run", _c30),
+    _check("31.briefing tops parked run with own reason", _c31),
+    _check("32.quiet project honestly reports nothing-needs-you", _c32),
+    _check("33.briefing respects the 7-item cap", _c33),
 ]

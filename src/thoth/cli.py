@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import db, notes, resume, runner, session, tasks, tools
+from . import briefing, db, notes, resume, runner, session, tasks, tools
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -256,6 +256,20 @@ def cmd_run(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_briefing(args: argparse.Namespace) -> int:
+    conn = _connect(args)
+    try:
+        report = briefing.build(conn, getattr(args, "project", None))
+        if getattr(args, "json", False):
+            import json
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            print(briefing.render(report))
+        return 0
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
@@ -350,6 +364,11 @@ def build_parser() -> argparse.ArgumentParser:
     rsp.add_argument("--max-turns", type=int, default=25)
     rsp.add_argument("--budget", type=int, default=20)
     rsp.set_defaults(func=cmd_run)
+
+    bp = sub.add_parser("briefing", help="morning briefing from stored state (≤7 items)")
+    bp.add_argument("--project")
+    bp.add_argument("--json", action="store_true")
+    bp.set_defaults(func=cmd_briefing)
 
     return p
 

@@ -5,6 +5,12 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 ## [Unreleased]
 
 ### Added
+- **`thoth briefing`** (Azaris-parity track, V1 item pulled forward): morning report
+  generated from stored state only — parked runs (with resume commands), open work,
+  last wrap-up. ≤7 items, "Nothing needs you today." is a valid output; zero network,
+  zero AI, Windows-console-safe ASCII rendering. Golden checks 31–33 added (33 total).
+- Benchmark: `docs/reviews/azaris-benchmark.md` — capability map vs azaris.ai at $0,
+  pulled-forward track (briefing → Telegram V1.5 → Gmail triage V2).
 - **Golden-set eval harness** (V0 gate): deterministic seed world (two projects,
   fixed timestamps, known sessions/tasks/notes/runs) + 30 stored-state questions
   that continue/status/run must answer from the DB alone, zero AI calls.
