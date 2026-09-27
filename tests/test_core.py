@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from jarvis import db, events, notes, session, tasks
+from thoth import db, events, notes, session, tasks
 
 
 @pytest.fixture()
@@ -92,11 +92,11 @@ def test_invalid_status_rejected(conn):
 # ------------------------------------------------------------------- notes
 
 def test_note_add_list_supersede(conn):
-    n1 = notes.add(conn, "uses WAL mode", kind="decision", project="jarvis")
-    rows = notes.list_open(conn, project="jarvis", kind="decision")
+    n1 = notes.add(conn, "uses WAL mode", kind="decision", project="thoth")
+    rows = notes.list_open(conn, project="thoth", kind="decision")
     assert [r["id"] for r in rows] == [n1]
 
-    n2 = notes.add(conn, "switched to WAL+checkpointing", kind="decision", project="jarvis")
+    n2 = notes.add(conn, "switched to WAL+checkpointing", kind="decision", project="thoth")
     notes.supersede(conn, n1, n2)
     ids = [r["id"] for r in notes.list_open(conn, kind="decision")]
     assert n1 not in ids and n2 in ids

@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS workdirs (
 
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
-    """Open (creating if needed) the Jarvis database with WAL enabled."""
+    """Open (creating if needed) the Thoth database with WAL enabled."""
     path = Path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)

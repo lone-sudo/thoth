@@ -5,16 +5,16 @@ overturn stays unbuilt until the merge lands.**
 
 ## V0 — walking skeleton (now)
 
-- [x] Sessions: `jarvis start / stop / continue / status`
-- [x] Append-only event log (`jarvis log`)
-- [x] Tasks with dependencies (`jarvis task add/list/next/update`)
+- [x] Sessions: `thoth start / stop / continue / status`
+- [x] Append-only event log (`thoth log`)
+- [x] Tasks with dependencies (`thoth task add/list/next/update`)
 - [x] Read-only git snapshot in `continue` (branch, dirty files, last commit, stashes)
 - [x] Notes store (facts / decisions / preferences / lessons; supersede, never delete)
 - [x] ADR-001 (monolith, SQLite, CLI, stdlib-only), ADR-002 (events → derived views)
 - [ ] Golden-set eval harness (30 stored-state questions answered from the DB only)
 
-**Milestone test:** tell Jarvis what you're working on, close the laptop, come back in
-two days, run `jarvis continue` — it reconstructs where you were. Zero AI calls.
+**Milestone test:** tell Thoth what you're working on, close the laptop, come back in
+two days, run `thoth continue` — it reconstructs where you were. Zero AI calls.
 
 ## V0.2 — the runner loop
 
@@ -32,7 +32,7 @@ two days, run `jarvis continue` — it reconstructs where you were. Zero AI call
 - [ ] Permission table `{domain → level}` + typed confirmation for destructive actions
 - [ ] Tasks get deadlines; morning briefing + end-of-day digest (generated from stored
       state only, ≤7 items, "nothing needs you" is a valid output)
-- [ ] 5–8 tools; git branch protocol (AI works only on `jarvis/*` branches)
+- [ ] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches)
 
 ## V2 — memory + content
 

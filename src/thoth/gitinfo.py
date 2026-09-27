@@ -1,6 +1,6 @@
 """Read-only Git inspection for "where did I leave off?" — zero AI calls, zero writes.
 
-V0 scope: the *current* repo only (the directory Jarvis is asked about). No remote
+V0 scope: the *current* repo only (the directory Thoth is asked about). No remote
 calls, no mutation; anything risky belongs to the V0.2+ permission model.
 """
 

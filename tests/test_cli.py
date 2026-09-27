@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from jarvis import cli, db
+from thoth import cli, db
 
 
 @pytest.fixture()
@@ -109,7 +109,7 @@ def test_task_dependency_next(run):
 
 def test_note_via_cli(run):
     _run, _, _ = run
-    code, out = _run("note", "add", "prefer WAL mode", "--kind", "preference", "--project", "jarvis")
+    code, out = _run("note", "add", "prefer WAL mode", "--kind", "preference", "--project", "thoth")
     assert code == 0
     code, out = _run("note", "list", "--kind", "preference")
     assert code == 0 and "prefer WAL mode" in out

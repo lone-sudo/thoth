@@ -6,7 +6,8 @@
 
 ## Context
 
-Jarvis is a personal AI operating layer built by one person, part-time. The full
+Thoth (working title: Jarvis; renamed 2026-09-27 to avoid the existing lone-sudo/jarvis
+project) is a personal AI operating layer built by one person, part-time. The full
 architecture (memory, routing, content inbox, autonomy) is specified in the Team-A
 review, but building everything at once is how this project dies. We need the smallest
 core that is genuinely useful this week: sessions, an event log, notes, tasks, and a
@@ -15,11 +16,11 @@ reliable "where did I leave off?" — with zero AI calls and zero spending.
 ## Decision
 
 1. **One process, one package.** No microservices, no queues, no Docker in V0/V1.
-   A single Python package (`jarvis`) with a CLI entry point.
-2. **SQLite is the database**, WAL mode, one file (`~/.jarvis/jarvis.db`).
-   Postgres stays for the data-engineering projects; it must not become a Jarvis
+   A single Python package (`thoth`) with a CLI entry point.
+2. **SQLite is the database**, WAL mode, one file (`~/.thoth/thoth.db`).
+   Postgres stays for the data-engineering projects; it must not become a Thoth
    dependency or a shared failure domain.
-3. **CLI-first.** `jarvis start / stop / continue / status / log / task …`.
+3. **CLI-first.** `thoth start / stop / continue / status / log / task …`.
    No GUI, no server, no voice. A thin SSH client on the ZBook can run the same CLI
    against `lone1` later without new code.
 4. **Stdlib only for V0.** No runtime dependencies. First dependency allowed only when
@@ -34,8 +35,7 @@ reliable "where did I leave off?" — with zero AI calls and zero spending.
 
 ## Alternatives rejected (for now)
 
-- **Postgres + pgvector** — better at scale/semantics, worse at "copy one file to back
-  up"; couples Jarvis's uptime to a server. Revisit when retrieval needs ANN at >100k notes.
+- **Postgres + pgvector** — better at scale/semantics, worse at "copy one file to back   up"; couples Thoth's uptime to a server. Revisit when retrieval needs ANN at >100k notes.
 - **Modular monorepo of services** — deploy scripts before features; the thing §45 warns about.
 - **Web/TUI shell first** — UI work before the loop exists. CLI is also what an agent
   (the future runner) will drive, so the CLI is the real product surface.
@@ -45,4 +45,4 @@ reliable "where did I leave off?" — with zero AI calls and zero spending.
 - Background digest/content jobs corrupt or block interactive use (→ consider a
   scheduler process, still same DB).
 - Memory retrieval needs vector search at scale (→ add `sqlite-vec`, stay SQLite).
-- A second machine must run Jarvis code (→ package it properly; still no services).
+- A second machine must run Thoth code (→ package it properly; still no services).

@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from jarvis import db, events
+from thoth import db, events
 
 
 @pytest.fixture()
@@ -47,7 +47,7 @@ def test_events_are_append_only(conn):
     events.emit(conn, "kind.one", {"n": 1})
     before = conn.execute("SELECT COUNT(*) AS n FROM events").fetchone()["n"]
     # Mutating other state must never change the events table.
-    tasks_module = pytest.importorskip("jarvis.tasks")
+    tasks_module = pytest.importorskip("thoth.tasks")
     tasks_module.add(conn, "t")
     after = conn.execute("SELECT COUNT(*) AS n FROM events").fetchone()["n"]
     assert after == before + 1  # exactly the task.added event, nothing rewritten

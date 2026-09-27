@@ -1,4 +1,4 @@
-"""Jarvis CLI: start / stop / continue / status / log / task.
+"""Thoth CLI: start / stop / continue / status / log / note / task.
 
 Stdlib only (ADR-001). Every mutating command appends events (ADR-002).
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 from . import db, notes, resume, session, tasks
 from .events import emit
 
-DEFAULT_DB = Path.home() / ".jarvis" / "jarvis.db"
+DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
 
 
 def _connect(args: argparse.Namespace):
@@ -184,7 +184,7 @@ def cmd_note(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="jarvis", description="Jarvis — personal AI operating layer")
+    p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
     sub = p.add_subparsers(dest="command", required=True)
 

@@ -1,4 +1,4 @@
-# Jarvis — personal AI operating layer
+# Thoth — personal AI operating layer
 
 > **Status: V0 — walking skeleton.** ✅ Sessions · events · notes · tasks · "where did I leave off"
 > 🚧 Runner loop (plan → act → verify → checkpoint) · routing · $0 guard · content inbox
@@ -12,22 +12,22 @@ what was done, why, and how to undo it).
 ## Install
 
 ```bash
-cd jarvis
+cd thoth
 pip install -e .            # stdlib-only, no dependencies (ADR-001)
 ```
 
 ## Usage
 
 ```bash
-jarvis start --project structural-rcc-suite --task "Fix PG16 migration"   # begin session
-jarvis task add "Draft ADR-003" --project jarvis --after "Fix PG16 migration"
-jarvis task next --project jarvis                                        # dependency-aware suggestion
-jarvis status                                                            # what's open, what's next
-jarvis log --limit 5                                                     # recent events
-jarvis stop --summary "Migrated schema; indexes pending"                 # checkpoint session
-jarvis continue                                                          # where did I leave off?
-jarvis note add "Prefer WAL mode" --kind preference --project jarvis     # atomic note
-jarvis note list --kind decision                                         # active notes
+thoth start --project structural-rcc-suite --task "Fix PG16 migration"   # begin session
+thoth task add "Draft ADR-003" --project thoth --after "Fix PG16 migration"
+thoth task next --project thoth                                          # dependency-aware suggestion
+thoth status                                                             # what's open, what's next
+thoth log --limit 5                                                      # recent events
+thoth stop --summary "Migrated schema; indexes pending"                  # checkpoint session
+thoth continue                                                           # where did I leave off?
+thoth note add "Prefer WAL mode" --kind preference --project thoth       # atomic note
+thoth note list --kind decision                                          # active notes
 ```
 
 `task` subcommands: `add` (with `--after` for dependencies), `list`, `next`, `update`.
@@ -41,7 +41,7 @@ runner loop, not before.
 ## Layout
 
 ```
-src/jarvis/       paths, schema, db, events, session, resume, tasks, cli
+src/thoth/        paths, schema, db, events, session, resume, tasks, cli
 tests/            unit + integration (real SQLite via tmp_path)
 docs/             vision, roadmap, architecture (adrs/, reviews/, journal/)
 CHANGELOG.md
@@ -49,7 +49,7 @@ CHANGELOG.md
 
 ## Hard rules (non-negotiable, enforced in code later)
 
-- **$0 automatic spending** — Jarvis never triggers paid API usage.
+- **$0 automatic spending** — Thoth never triggers paid API usage.
 - **Declared tools only** — no ambient computer control.
 - **Append-only events** — raw history is never rewritten; derived views are regenerable (ADR-002).
 - **Show my work** — every mutation is logged with an event.

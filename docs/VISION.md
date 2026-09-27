@@ -1,6 +1,7 @@
 # VISION
 
-Jarvis is a personal AI operating layer: one person's digital chief of staff.
+Thoth (working title: Jarvis; renamed 2026-09-27 — a separate, unrelated lone-sudo/jarvis
+project already exists) is a personal AI operating layer: one person's digital chief of staff.
 
 It understands what I'm working on, remembers what I was doing, picks the right
 intelligence/tool for the job, acts on my machines **only through declared tools with
@@ -22,7 +23,7 @@ information into useful action without burying me in it — and it always shows 
 
 ## Non-negotiables
 
-- **$0 automatic spending.** Jarvis never triggers paid API usage. In V0 there is no
+- **$0 automatic spending.** Thoth never triggers paid API usage. In V0 there is no
   code path that *can* spend; the spend guard arrives with routing in V1, as code at a
   single choke point — not as policy text.
 - **Declared tools only.** The computer is operated exclusively through tool schemas

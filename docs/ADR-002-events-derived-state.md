@@ -6,7 +6,7 @@
 
 ## Context
 
-Jarvis must answer "where did I leave off?", "what did we decide?", and "what changed?"
+Thoth must answer "where did I leave off?", "what did we decide?", and "what changed?"
 reliably, without hallucination and without AI calls. That requires history that can be
 trusted and derived views (sessions, summaries, notes) that can be corrected or
 regenerated without touching the raw record.
@@ -29,10 +29,10 @@ regenerated without touching the raw record.
 
 ## Consequences
 
-- `jarvis continue` and `jarvis status` are pure reads: offline, $0, unhallucinatable.
+- `thoth continue` and `thoth status` are pure reads: offline, $0, unhallucinatable.
 - The future runner loop (V0.2) gets checkpoint/resume for free: a run is just another
   event kind (`run.*`); "resume" is "read the last one."
-- Full auditability: `jarvis log` is the complete answer to "show your work."
+- Full auditability: `thoth log` is the complete answer to "show your work."
 - Storage grows forever in V0 — acceptable for one person; consolidation arrives in V2.
 
 ## Alternatives rejected (for now)
