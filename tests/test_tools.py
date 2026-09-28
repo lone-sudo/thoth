@@ -32,6 +32,31 @@ def workspace(tmp_path):
     return ws, secret
 
 
+# ------------------------------------------------------------------ summarizers
+
+def test_summarize_file_names_path_and_head():
+    out = tools._summarize_file({"path": "ws/hello.txt", "detail": "11 chars",
+                                 "content": "hello thoth\n"})
+    assert "hello.txt" in out and "11 chars" in out and "hello thoth" in out
+
+
+def test_summarize_shell_reports_first_output_line():
+    out = tools._summarize_shell({"detail": "exit=0, 11 chars", "output": "alpha\nbeta"})
+    assert "alpha" in out and "beta" not in out
+
+
+def test_summarize_memory_reports_matches_and_misses():
+    assert "no notes" in tools._summarize_memory({"detail": "0 notes", "results": []})
+    out = tools._summarize_memory({"detail": "2 notes", "results": [
+        {"body": "postgres indexes rock"}, {"body": "docker tips"}]})
+    assert "2 notes" in out and "postgres" in out
+
+
+def test_default_summarize_is_detail_then_payload_capped():
+    out = tools.default_summarize({"detail": "exit=0", "output": "x" * 300})
+    assert out.startswith("exit=0 | ") and len(out) == 200
+
+
 # ------------------------------------------------------------------ registry
 
 def test_validate_rejects_missing_required(registry):

@@ -22,6 +22,7 @@ exhausted script finishes the run without touching the ladder.
 
 from __future__ import annotations
 
+import inspect
 import sqlite3
 from typing import Any
 
@@ -142,15 +143,77 @@ class ModelPlanner:
                  history: list[dict[str, Any]] | None = None) -> str:
         """One model call for one ladder candidate. Cloud providers raise
         ProviderUnavailable (no clients, $0-structural); the local provider goes
-        through the guard-gated ollama client."""
+        through the guard-gated ollama client. Client convention:
+        client(conn, prompt, system=<system prompt>) when the client accepts it
+        (signature-detected), else client(conn, prompt)."""
         if spec.is_local:
             client = _CLIENTS.get(spec.name)
             if client is None:
                 raise providers.ProviderUnavailable(
                     f"local provider '{spec.name}' has no client registered")
             prompt = self._build_prompt(context, history)
-            return client(self._conn, prompt)
+            return self._call_client(client, prompt, ollama.PLAN_SYSTEM)
         return providers.attempt(spec)  # cloud: raises, honestly
+
+    def _call_client(self, client: Any, prompt: str, system: str) -> str:
+        if "system" in inspect.signature(client).parameters:
+            return client(self._conn, prompt, system=system)
+        return client(self._conn, prompt)
+
+    # -- finish-confirmation probe ---------------------------------------------
+
+    def finish_check(self, goal: str,
+                     history: list[dict[str, Any]]) -> Plan | None:
+        """One tool-free decision probe (journal 2026-W39): with an action menu
+        visible, small models re-act instead of finishing (0/6 vs 2/2 measured).
+        Called by the runner before parking on a repeat-breaker: given the goal
+        and the verified results, is the goal already achieved? Returns a done
+        Plan, or None when the probe says no / fails (the caller keeps its own
+        terminal state). Every probe decision is an event."""
+        obs_lines = []
+        for i, t in enumerate(history, 1):
+            verify = t.get("verify") or {}
+            note = "ok" if verify.get("ok") else "failed"
+            obs_lines.append(f"  turn {i}: {t.get('tool') or '(finish)'} [{note}] "
+                             f"{str(t.get('output') or '')[:120]}")
+        prompt = (f"GOAL: {goal}\n\nVERIFIED RESULTS SO FAR:\n"
+                  + ("\n".join(obs_lines) or "  (none)")
+                  + "\n\nIs the goal already achieved? Reply with the JSON object only.")
+        candidates = providers.route(
+            self._registry, self._task_class,
+            min_context=self._min_context,
+            availability=self._availability)
+        emit(self._conn, "provider.route", {
+            "task_class": self._task_class, "finish_check": True,
+            "candidates": [s.name for s in candidates],
+        })
+        self._conn.commit()
+        for spec in candidates:
+            emit(self._conn, "provider.attempt", {
+                "task_class": self._task_class, "provider": spec.name,
+                "auth_type": spec.auth_type, "finish_check": True,
+            })
+            self._conn.commit()
+            try:
+                if spec.is_local:
+                    client = _CLIENTS.get(spec.name)
+                    if client is None:
+                        raise providers.ProviderUnavailable(
+                            f"local provider '{spec.name}' has no client registered")
+                    answer = self._call_client(client, prompt, ollama.FINISH_SYSTEM)
+                else:
+                    answer = providers.attempt(spec)
+                d = ollama.plan_from_json(answer)
+            except (providers.ProviderUnavailable, ollama.OllamaUnavailable) as exc:
+                self._outcome(spec, "error", f"finish check: {exc}")
+                continue
+            self._outcome(spec, "ok", "finish check")
+            if d.get("done"):
+                return Plan(tool=None, done=True,
+                            summary=d.get("summary") or "finish check passed",
+                            next_intent="")
+            return None  # one probe, no looping: the model said not done
+        return None
 
     def _build_prompt(self, context: str,
                       history: list[dict[str, Any]] | None = None) -> str:

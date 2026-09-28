@@ -41,6 +41,13 @@ PLAN_SYSTEM = (
     'set "done": true and "tool": null. Never invent tools.'
 )
 
+FINISH_SYSTEM = (
+    "You are Thoth's planner performing a FINISH CHECK. No tools are available. "
+    "Given the goal and the verified results so far, reply with ONE JSON object "
+    'only, no prose: {"done": <true|false>, "summary": "<one line - the answer '
+    'or what was accomplished>"}'
+)
+
 
 class OllamaUnavailable(RuntimeError):
     """The local server is unreachable, the model is missing, or the answer is
@@ -100,18 +107,22 @@ def probe(conn, endpoint: str = DEFAULT_ENDPOINT) -> tuple[bool, str]:
 
 
 def attempt(conn, prompt: str, *, endpoint: str = DEFAULT_ENDPOINT,
-            model: str = DEFAULT_MODEL, timeout_s: int = _TIMEOUT_S) -> str:
-    """One guarded chat completion; returns the model's text answer."""
+            model: str = DEFAULT_MODEL, timeout_s: int = _TIMEOUT_S,
+            system: str = PLAN_SYSTEM, temperature: float = 0.2) -> str:
+    """One guarded chat completion; returns the model's text answer.
+    `system`/`temperature` are overridable so the finish-confirmation probe can
+    ask a tool-free decision question (journal 2026-W39: with an action menu
+    visible, small models re-act instead of finishing — 0/6 vs 2/2 measured)."""
     target = f"local:ollama@{endpoint}"
     _guarded(conn, target)
     payload = {
         "model": model,
         "stream": False,
         "messages": [
-            {"role": "system", "content": PLAN_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
-        "options": {"temperature": 0.2},
+        "options": {"temperature": temperature},
     }
     try:
         data = _post_json(endpoint, "/api/chat", payload)

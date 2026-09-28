@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from thoth import db, runner, tools
+from thoth import db, notes, runner, tools
 
 
 @pytest.fixture()
@@ -177,7 +177,76 @@ def test_resume_carries_bounds_and_completes(conn):
     assert len(runner.history_of(conn, run_id)) == 5
 
 
+# ------------------------------------------------------------------ observations
+
+def test_checkpoint_carries_semantic_observation(conn):
+    """Every turn checkpoint carries WHAT happened (default_summarize floor) —
+    the planner self-terminates on semantic result lines, never raw digests."""
+    run_id = runner.start_run(conn, project="rcc", goal="be observable")
+    runner.execute_run(conn, run_id, runner.NoopPlanner(script=[("noop", {})]),
+                       _registry_ok())
+    turn = runner.history_of(conn, run_id)[0]
+    assert turn["output"]
+
+
+def test_memory_search_works_inside_run(conn):
+    """Regression: the runner now passes _conn, so memory.search is usable
+    inside a run (it silently failed verify before the wiring fix)."""
+    notes.add(conn, "postgres indexes rock", project="rcc")
+    run_id = runner.start_run(conn, project="rcc", goal="find the note")
+    result = runner.execute_run(
+        conn, run_id,
+        runner.NoopPlanner(script=[("memory.search", {"query": "postgres"})]),
+        tools.default_registry())
+    assert result.status == "done"
+    turn = runner.history_of(conn, run_id)[0]
+    assert turn["verify"]["ok"]
+    assert "postgres" in turn["output"].lower()
+
+
 # ------------------------------------------------------------------ repeat-breaker
+
+class FinishCheckPlanner:
+    """NoopPlanner + scripted finish_check answers (the probe contract is:
+    called once with (goal, history); a done Plan completes the run, None parks)."""
+
+    def __init__(self, script, answers):
+        self._nop = runner.NoopPlanner(script=script)
+        self.answers = list(answers)
+        self.probes: list[tuple[str, list]] = []
+
+    def decide(self, context, history):
+        return self._nop.decide(context, history)
+
+    def finish_check(self, goal, history):
+        self.probes.append((goal, list(history)))
+        return self.answers.pop(0) if self.answers else None
+
+
+def test_repeat_breaker_finish_check_completes(conn):
+    """Probe says yes -> graceful finish instead of a diagnostic park."""
+    run_id = runner.start_run(conn, project="rcc", goal="read the readme")
+    planner = FinishCheckPlanner(
+        script=[("noop", {}), ("noop", {})],
+        answers=[runner.Plan(tool=None, done=True, summary="goal achieved")])
+    result = runner.execute_run(conn, run_id, planner, _registry_ok(),
+                                max_turns=10, tool_calls_budget=10)
+    assert result.status == "done"
+    assert result.reason == "goal achieved"
+    assert len(planner.probes) == 1
+    goal, hist = planner.probes[0]
+    assert goal == "read the readme" and len(hist) == 1
+
+
+def test_repeat_breaker_finish_check_decline_parks(conn):
+    """Probe says no -> the diagnostic park stands (one probe, no looping)."""
+    run_id = runner.start_run(conn, project="rcc", goal="not done yet")
+    planner = FinishCheckPlanner(script=[("noop", {}), ("noop", {})], answers=[None])
+    result = runner.execute_run(conn, run_id, planner, _registry_ok(),
+                                max_turns=10, tool_calls_budget=10)
+    assert result.status == "parked"
+    assert "repeat-breaker" in result.reason
+    assert len(planner.probes) == 1
 
 def test_repeat_breaker_parks_identical_idempotent_repeat(conn):
     """Live finding (journal 2026-W39): a model loops forever on a successful

@@ -53,17 +53,20 @@ FEWSHOT = (
 )
 
 
-def _shim_attempt(conn, prompt: str) -> str:
-    """Same contract as ollama.attempt: guard first, then one local completion
+def _shim_attempt(conn, prompt: str, system: str | None = None) -> str:
+    """Same contract as ollama.attempt (plus the optional system override the
+    finish-confirmation probe uses): guard first, then one local completion
     over llama-server's OpenAI-compatible /v1/chat/completions."""
     _guard_or_raise(conn)
-    if _FLAGS["fewshot"]:
+    if system is None:
+        system = ollama.PLAN_SYSTEM
+    if _FLAGS["fewshot"] and system is ollama.PLAN_SYSTEM:
         prompt = FEWSHOT + prompt
     payload = {
         "model": _MODEL_NAME,
         "stream": False,
         "messages": [
-            {"role": "system", "content": ollama.PLAN_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.4,

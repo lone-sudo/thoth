@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from . import tasks as tasks_mod
 from .events import emit, now_iso
-from .tools import ToolRegistry, ToolSpec, VerifyReport
+from .tools import ToolRegistry, ToolSpec, VerifyReport, default_summarize
 
 # ---------------------------------------------------------------------------
 # event kinds
@@ -325,10 +325,24 @@ def execute_run(
         # retrying a flaky failure can still earn information.
         digest = _digest(clean_args)
         if digest == last_digest and spec.idempotent:
+            # Finish-confirmation probe (journal 2026-W39): with an action menu
+            # visible, small models re-act instead of finishing — so ask the
+            # question tool-free, exactly once, before parking. Optional planner
+            # capability; without it the diagnostic park stands.
+            probe = getattr(planner, "finish_check", None)
+            if probe is not None:
+                done_plan = probe(goal, history)
+                if done_plan is not None and done_plan.done:
+                    summary = done_plan.summary or "finish check passed"
+                    _finish(conn, run_id, summary)
+                    return RunResult(run_id, "done", summary, turns_used)
             return _park(conn, run_id, project,
                          "repeat-breaker: identical idempotent action repeated")
 
-        result = spec.run(**clean_args)
+        result = spec.run(**clean_args, _conn=conn)
+        # _conn wiring (journal 2026-W39, latent bug found building the
+        # summarizer layer): memory.search needs the connection the runner
+        # already holds; without it every in-run memory.search failed verify.
         tool_calls_used += 1
         turns_used += 1
 
@@ -344,14 +358,11 @@ def execute_run(
                              f"verify failed {PARK_LIMIT}x: {report.detail}")
 
         # --- checkpoint -------------------------------------------------------
-        # Output observation (journal 2026-W39): the planner must SEE what a
-        # turn produced, and completeness is the signal that ends loops — a raw
-        # truncated prefix reads as "incomplete document" and invites re-reading.
-        # Lead with the tool's own summary (detail), then a payload sample.
-        detail = str(result.get("detail") or "")
-        payload = str(result.get("output") or result.get("content") or "")
-        room = max(0, 200 - len(detail) - 3)
-        snippet = f"{detail} | {payload[:room]}" if payload else detail
+        # Output observation (journal 2026-W39): the planner self-terminates on
+        # SEMANTIC result lines, never on raw payloads (measured). Tools own
+        # their summaries (ToolSpec.summarize); default_summarize is the floor.
+        snippet = (spec.summarize(result) if spec.summarize
+                   else default_summarize(result))[:200]
         emit(conn, K_TURN_COMPLETED, {
             "run_id": run_id,
             "turn": turns_used,

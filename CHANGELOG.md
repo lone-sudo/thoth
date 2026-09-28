@@ -4,6 +4,23 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — result summarizer + finish-confirmation probe (2026-09-28, latest)
+- **Per-tool result summarization** (the documented V2 layer, pulled forward):
+  `ToolSpec.summarize` gives each tool its semantic observation — the planner
+  self-terminates on semantic result lines, never raw payloads (measured).
+  `default_summarize` is the floor; runner caps at 200 chars.
+- **Finish-confirmation probe**: a repeat-breaker hit now triggers one tool-
+  free decision question (FINISH_SYSTEM) through the full guarded ladder —
+  "yes" completes the run gracefully with the model's own summary, "no"
+  keeps the diagnostic park. Optional planner capability; fully event-logged.
+- **Latent bug fixed:** runner now passes `_conn` into tool calls —
+  memory.search was silently unusable inside runs; regression test added.
+- **Measured finding (journal):** with an action menu visible, Qwen2.5-3B
+  re-acts instead of finishing (0/6 vs 2/2 with the menu removed) — the probe
+  asks the decision question without the menu. `smoke --plain` now PASSES
+  2/2: hint-free goal → verified action → probe → self-driven done.
+- Suite at 110; golden 38/38.
+
 ### Added — Qwen2.5-3B proof + planner/runner hardening (2026-09-28, later)
 - **Repeat-breaker** (`runner.py`): a repeat of a VERIFIED-OK idempotent action
   parks the run before executing — turns the observed live loop (identical

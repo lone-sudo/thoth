@@ -43,6 +43,7 @@ class ToolSpec:
     required: set[str] = field(default_factory=set)
     run: Callable[..., dict[str, Any]] = None  # type: ignore[assignment]
     verify: Callable[[dict[str, Any]], "VerifyReport"] = None  # type: ignore[assignment]
+    summarize: Callable[[dict[str, Any]], str] | None = None  # per-tool observation; None -> default_summarize
 
 
 @dataclass
@@ -107,6 +108,17 @@ def _result(ok: bool, detail: str, **extra: Any) -> dict[str, Any]:
 def _emit_tool_event(conn: sqlite3.Connection | None, kind: str, payload: dict[str, Any]) -> None:
     if conn is not None:
         emit(conn, kind, payload)
+
+
+def default_summarize(result: dict[str, Any]) -> str:
+    """Semantic-observation floor (journal 2026-W39): every turn checkpoint must
+    carry WHAT happened, not just that something did — the planner self-
+    terminates on semantic result lines, never on raw payloads (measured with
+    Qwen2.5-3B). Tools override via ToolSpec.summarize; this is the fallback."""
+    detail = str(result.get("detail") or "")
+    payload = str(result.get("output") or result.get("content") or "")
+    room = max(0, 200 - len(detail) - 3)
+    return f"{detail} | {payload[:room]}" if payload else detail
 
 
 # --------------------------------------------------------------------------
@@ -175,6 +187,14 @@ def _run_shell(command: str, workdir: str | None = None, max_chars: int = MAX_OU
     return result
 
 
+def _summarize_shell(result: dict[str, Any]) -> str:
+    if result.get("blocked"):
+        return f"shell.read blocked: {result.get('detail', '')}"
+    out = str(result.get("output") or "")
+    first = out.splitlines()[0][:120] if out else "(no output)"
+    return f"Command finished ({result.get('detail', '')}). First output line: {first}"
+
+
 def _verify_shell(result: dict[str, Any]) -> VerifyReport:
     if result.get("blocked"):
         return VerifyReport(False, "allowlist rejection")
@@ -187,6 +207,16 @@ def _verify_shell(result: dict[str, Any]) -> VerifyReport:
 # --------------------------------------------------------------------------
 # file.read
 # --------------------------------------------------------------------------
+
+def _summarize_file(result: dict[str, Any]) -> str:
+    """What the planner needs to feel done is *what was read* — not a char count
+    followed by a mid-word prefix that reads as an unfinished document."""
+    if result.get("blocked"):
+        return f"file.read blocked: {result.get('detail', '')}"
+    path = str(result.get("path") or "unknown path")
+    head = str(result.get("content") or "")[:120].replace("\n", " ")
+    return f"Read {path} ({result.get('detail', '')}). Starts with: {head}"
+
 
 def _safe_path(workspace: Path, target: str) -> Path | None:
     """Resolve target inside workspace; None on escape or missing file."""
@@ -263,6 +293,14 @@ def _run_memory(query: str, project: str | None = None, limit: int = 5,
     return _result(True, f"{len(results)} notes", results=results)
 
 
+def _summarize_memory(result: dict[str, Any]) -> str:
+    results = result.get("results") or []
+    if not results:
+        return f"Memory search: no notes matched ({result.get('detail', '')})."
+    tops = "; ".join(str(r.get("body", ""))[:60] for r in results[:3])
+    return f"Memory search found {len(results)} notes: {tops}"
+
+
 def _verify_memory(result: dict[str, Any]) -> VerifyReport:
     return VerifyReport(result.get("ok") is True and "results" in result,
                         f"{len(result.get('results', []))} results")
@@ -280,6 +318,7 @@ def default_registry() -> ToolRegistry:
         permission_level=0, idempotent=True, privacy_floor=0,
         input_schema={"command": "str", "workdir": "str", "max_chars": "int"},
         required={"command"}, run=_run_shell, verify=_verify_shell,
+        summarize=_summarize_shell,
     ))
     reg.register(ToolSpec(
         name="file.read",
@@ -287,6 +326,7 @@ def default_registry() -> ToolRegistry:
         permission_level=0, idempotent=True, privacy_floor=0,
         input_schema={"path": "path", "workspace": "str", "max_chars": "int"},
         required={"path"}, run=_run_file, verify=_verify_file,
+        summarize=_summarize_file,
     ))
     reg.register(ToolSpec(
         name="memory.search",
@@ -294,5 +334,6 @@ def default_registry() -> ToolRegistry:
         permission_level=0, idempotent=True, privacy_floor=0,
         input_schema={"query": "str", "project": "str", "limit": "int"},
         required={"query"}, run=_run_memory, verify=_verify_memory,
+        summarize=_summarize_memory,
     ))
     return reg
