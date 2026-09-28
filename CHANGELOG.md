@@ -4,6 +4,17 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — ADR-005 (2026-09-28, latest)
+- **ADR-005 (proposed): Telegram as Thoth's second surface** — Bot API briefing
+  and digest delivery, fail-closed approval cards for
+  `guard.require_confirmation` (resolving ADR-004 Open Question 4: the
+  interrupting channel exists and is pull-safe), privacy ceiling at delivery
+  (PRIVATE renders as counts, SENSITIVE withheld), exact-host endpoint
+  allowlist, token redaction, chat-id allowlist, and structural
+  no-new-permissions guarantees (zero ToolSpecs, read-only pulls, CI whitelist
+  of exactly three I/O modules). Polling only — no inbound ports. Staged for
+  Team-B.
+
 ### Added — result summarizer + finish-confirmation probe (2026-09-28, latest)
 - **Per-tool result summarization** (the documented V2 layer, pulled forward):
   `ToolSpec.summarize` gives each tool its semantic observation — the planner

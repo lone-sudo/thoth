@@ -54,7 +54,8 @@ defense) — lands together with the provider registry, not after.*
       resume commands (parity track item 1; Azaris-benchmark)
 - [ ] Tasks get deadlines; end-of-day digest + weekly review
 - [ ] Telegram surface (V1.5): Bot API briefing delivery + approval cards wired to
-      `guard.require_confirmation`; grants no new permissions
+      `guard.require_confirmation`; grants no new permissions (designed in
+      ADR-005, proposed — implementation pending)
 - [ ] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches)
 
 ## V2 — memory + content
