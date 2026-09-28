@@ -135,7 +135,7 @@ def plan_from_json(answer: str) -> dict[str, Any]:
     if start == -1 or end <= start:
         raise OllamaUnavailable(f"no JSON object in planner answer: {answer[:120]!r}")
     try:
-        plan = json.loads(text[start:end + 1])
+        plan, _end = json.JSONDecoder().raw_decode(text[start:])
     except json.JSONDecodeError as exc:
         raise OllamaUnavailable(f"planner answer not valid JSON: {exc}") from exc
     if not isinstance(plan, dict):

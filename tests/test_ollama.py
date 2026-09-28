@@ -24,9 +24,11 @@ def conn(tmp_path):
 # ------------------------------------------------------------------ gate-first
 
 def test_probe_allowed_by_local_branch_then_fails_on_unreachable_server(conn):
-    """Post local-branch: the guard ALLOWS local: targets; with no Ollama
-    running the probe fails at the socket, honestly, as (False, reason)."""
-    ok, reason = probe(conn)
+    """Post local-branch: the guard ALLOWS local: targets; with nothing listening
+    (guaranteed: port 1 on loopback) the probe fails at the socket, honestly,
+    as (False, reason). Port 1, not the default endpoint — tests must not care
+    whether a real local server runs on this machine."""
+    ok, reason = probe(conn, endpoint="http://127.0.0.1:1")
     assert ok is False
     assert "probe failed" in reason and "URLError" in reason
     events = [json.loads(r["payload_json"]) for r in conn.execute(
@@ -35,9 +37,11 @@ def test_probe_allowed_by_local_branch_then_fails_on_unreachable_server(conn):
     assert events[0]["rule"] == "local-egress"
 
 
-def test_attempt_denied_by_stock_guard(conn):
+def test_attempt_fails_honestly_without_server(conn):
+    """With nothing listening on the (port-1) endpoint, attempt raises
+    OllamaUnavailable — degradation, never a guessed action."""
     with pytest.raises(OllamaUnavailable):
-        ollama.attempt(conn, "plan something")
+        ollama.attempt(conn, "plan something", endpoint="http://127.0.0.1:1")
 
 
 def test_non_loopback_endpoint_refused(conn):
@@ -114,6 +118,26 @@ def test_probe_empty_model_list_is_unavailable(conn, monkeypatch):
     with patch.object(ollama, "_post_json", lambda endpoint, path, payload: {"models": []}):
         ok, reason = probe(conn)
     assert ok is False and "no models" in reason
+
+
+# ------------------------------------------------- parser robustness (live-detour)
+
+def test_plan_from_json_tolerates_trailing_prose():
+    """Small local models emit JSON + rambling; the first JSON object is the plan
+    (caught live: SmolLM2-135M on llama-server, journal 2026-W39)."""
+    plan = plan_from_json(
+        '{"tool": "file.read", "args": {"path": "README.md"}, '
+        '"summary": "read it", "next_intent": "finish", "done": false}\n'
+        'I will now read the README file as requested.')
+    assert plan["tool"] == "file.read"
+    assert plan["done"] is False
+
+
+def test_plan_from_json_still_rejects_leading_prose_without_object():
+    plan = plan_from_json('Sure! {"tool": null, "args": {}, "done": true}')
+    assert plan["done"] is True
+    with pytest.raises(OllamaUnavailable):
+        plan_from_json("no object here at all")
 
 
 # ------------------------------------------------------------------ CI whitelist integrity

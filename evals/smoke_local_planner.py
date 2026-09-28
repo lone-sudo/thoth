@@ -1,0 +1,177 @@
+"""End-to-end smoke: one run planned by a REAL local model, zero cloud, zero $.
+
+Prereqs (journal 2026-W39): llama-server (llama.cpp b11223) serving a SmolLM2
+GGUF on 127.0.0.1:11434. llama-server speaks OpenAI wire format, not Ollama's —
+so the driver registers a shim client (same signature, same guard call, /v1/
+endpoints). Production Ollama needs NO shim; the shim exists so the full ladder
+is exercisable on any box. Every byte still crosses guard.check_egress.
+
+  llama-server -m model.gguf --port 11434
+
+Usage: python -m evals.smoke_local_planner
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from urllib import request as _urlrequest
+from urllib.error import URLError
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from thoth import db, events, ollama, providers, runner, tools  # noqa: E402
+from thoth.planner_model import ModelPlanner, _CLIENTS  # private seam, journaled
+
+WS = Path(__file__).resolve().parents[2]  # structural-rcc-suite-v4/
+TARGET = "local:llama-server@http://127.0.0.1:11434"
+_MODEL_NAME = "smollm2-135m"  # replaced by whatever /v1/models reports
+
+
+def _guard_or_raise(conn) -> None:
+    g = ollama.Guard(conn, actor="ollama-client")
+    decision = g.check_egress(ollama.KIND_PROVIDER, TARGET, data_class=ollama.PUBLIC)
+    if not decision.allowed:
+        raise ollama.OllamaUnavailable(f"guard denied egress: {decision.reason}")
+
+
+FEWSHOT = (
+    "EXAMPLE:\n"
+    "CONTEXT:\nGoal: show the notes file.\n"
+    "TOOL LIST:\n- file.read: Read a text file inside the workspace.\n"
+    '- shell.read: Run an allowlisted read-only shell command.\n\n'
+    'Correct plan: {"tool": "file.read", "args": {"path": "NOTES.md"}, '
+    '"summary": "read NOTES.md", "next_intent": "show it", "done": false}\n\n'
+    "NOW THE REAL TASK.\n\n"
+)
+
+
+def _shim_attempt(conn, prompt: str) -> str:
+    """Same contract as ollama.attempt: guard first, then one local completion
+    over llama-server's OpenAI-compatible /v1/chat/completions."""
+    _guard_or_raise(conn)
+    prompt = FEWSHOT + prompt
+    payload = {
+        "model": _MODEL_NAME,
+        "stream": False,
+        "messages": [
+            {"role": "system", "content": ollama.PLAN_SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.1,
+        "max_tokens": 150,
+    }
+    req = _urlrequest.Request(
+        "http://127.0.0.1:11434/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with _urlrequest.urlopen(req, timeout=180) as resp:  # noqa: S310 (loopback only)
+            data = json.loads(resp.read().decode("utf-8"))
+    except (URLError, OSError) as exc:
+        raise ollama.OllamaUnavailable(
+            f"local server failed: {type(exc).__name__}: {exc}") from exc
+    choices = data.get("choices") or []
+    content = (choices[0].get("message") or {}).get("content", "") if choices else ""
+    if not str(content).strip():
+        raise ollama.OllamaUnavailable("local server returned an empty answer")
+    return str(content)
+
+
+def _probe_llama(conn) -> tuple[bool, str]:
+    """Guard-gated availability probe against llama-server's /v1/models."""
+    try:
+        _guard_or_raise(conn)
+    except ollama.OllamaUnavailable as exc:
+        return False, str(exc)
+    try:
+        with _urlrequest.urlopen("http://127.0.0.1:11434/v1/models", timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        names = [m.get("id", "") or m.get("name", "") for m in data.get("data", [])]
+        names = [n for n in names if n]
+        if not names:
+            return False, "server reachable but no model loaded"
+        global _MODEL_NAME
+        _MODEL_NAME = names[0]
+        return True, f"models: {', '.join(names[:3])}"
+    except (URLError, OSError, json.JSONDecodeError) as exc:
+        return False, f"llama-server probe failed: {type(exc).__name__}: {exc}"
+
+
+def _seed(conn) -> None:
+    events.emit(conn, "session.started", {"id": "s-smoke", "project": "thoth"})
+    events.emit(conn, "session.wrapup", {"id": "s-smoke", "summary": "smoke seed"})
+    events.emit(conn, "session.ended", {"id": "s-smoke", "project": "thoth"})
+
+
+def main() -> int:
+    tmp = Path.home() / "AppData/Local/Temp/thoth-smoke-run.db"
+    if tmp.exists():
+        tmp.unlink()
+    conn = db.connect(tmp)
+
+    print("== 1. guard-gated probe ==")
+    ok, why = _probe_llama(conn)
+    print(f"   probe: {ok} ({why})")
+    if not ok:
+        print("   STOP: start llama-server first (see module docstring).")
+        conn.close()
+        return 1
+    avail = providers.AvailabilityCache()
+    avail.mark("ollama-local", True, why)
+
+    print("== 2. register shim client (OpenAI-wire shim, guard-gated) ==")
+    _CLIENTS["ollama-local"] = _shim_attempt
+    print("   _CLIENTS['ollama-local'] -> llama-server /v1 wire shim")
+
+    print("== 3. seed + start run ==")
+    _seed(conn)
+    # Spoon-fed goal (journaled): tiny models parrot rather than adapt, so the
+    # goal carries an explicit suggested plan. Proves the MECHANICS (parse ->
+    # validate -> tool -> verify -> checkpoint -> done); protocol-following
+    # without hints needs a >=1.5B model (see journal 2026-W39).
+    sid = runner.start_run(
+        conn, "thoth",
+        'Read the file README.md. Suggested plan: {"tool": "file.read", '
+        '"args": {"path": "README.md"}, "summary": "read README.md", '
+        '"next_intent": "report and finish", "done": false}',
+        max_turns=4, tool_calls_budget=4)
+    print(f"   run {sid} created (project 'thoth')")
+
+    print("== 4. execute: full ladder, real model plans each turn ==")
+    registry = tools.default_registry()
+    planner = ModelPlanner(conn, availability=avail, task_class="plan",
+                           tool_registry=registry)
+    result = runner.execute_run(conn, sid, planner, registry, max_turns=4,
+                                tool_calls_budget=4)
+    print(f"   result: {result.status} ({result.reason})")
+
+    # Pass criterion (journal 2026-W39): >=1 verified tool turn means the full
+    # ladder worked on a real model. A clean self-driven finish needs a bigger
+    # model (protocol adherence), so run.status alone is NOT the gate.
+    turns = conn.execute(
+        "SELECT COUNT(*) AS n FROM events WHERE kind='run.turn.completed' "
+        "AND json_extract(payload_json, '$.verify.ok') = 1").fetchone()["n"]
+    print(f"   verified tool turns: {turns}")
+
+    print("== 5. event trail ==")
+    for row in conn.execute(
+            "SELECT kind, payload_json FROM events ORDER BY rowid"):
+        payload = json.loads(row["payload_json"]) if row["payload_json"] else {}
+        brief = ""
+        if row["kind"] == "run.turn.completed":
+            brief = (f"tool={payload.get('tool')} "
+                     f"ok={payload.get('verify', {}).get('ok')}")
+        elif row["kind"] == "provider.outcome":
+            brief = f"{payload.get('provider')} -> {payload.get('outcome')}"
+        elif row["kind"] == "guard.decision":
+            brief = f"{payload.get('kind')} {payload.get('verdict')} ({payload.get('rule')})"
+        print(f"   {row['kind']:<26} {brief}")
+
+    conn.close()
+    return 0 if turns >= 1 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

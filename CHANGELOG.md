@@ -4,10 +4,30 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — live local-brain milestone (2026-09-28)
+- **`ollama.py` client (the package's single I/O module):** gate-before-bytes
+  (`guard.check_egress` on every probe/attempt), loopback-only endpoints, JSON
+  plan contract (`plan_from_json` never trusts the model); whitelisted in the
+  CI no-bypass scan alongside guard.py and nothing else.
+- **Guard `local:` allow-branch:** the single egress rule — `provider` crossings
+  to `local:` targets are allowed (and logged); cloud stays denied; prefix-spoof
+  (leading whitespace) tested.
+- **ModelPlanner live path:** route → guard-gated attempt → parse → registry
+  validation → Plan; outcomes `ok`/`unavailable`/`error` all emitted (the V3
+  router dataset includes wins). An invalid model proposal parks the run.
+- **`evals/smoke_local_planner.py`:** end-to-end smoke — guard-gated probe,
+  llama-server wire shim (OpenAI format), full runner loop, event trail; pass
+  gate = ≥1 verified tool turn on a real local model.
+- Parser robustness from live findings: trailing-prose answers parse (first JSON
+  object via `raw_decode`); probe/attempt tests pinned to a dead port so they
+  don't depend on the machine's running services.
+- Suite at 99 passing; golden 38/38.
+
 ### Added
 - **Guard skeleton (ADR-004 implemented):** `guard.py` — fail-closed tool gate
   (level>0 denied until the confirmation flow lands; privacy-ceiling enforcement;
-  SENSITIVE cleared to no tool), provider/network egress denied outright, every
+  SENSITIVE cleared to no tool), cloud/provider egress denied (the `local:`
+  allow-branch arrives in the milestone cluster above), every
   verdict a `guard.decision` event; no-bypass CI scan (no network primitives or
   provider imports outside guard.py; the guard itself performs no I/O).
 - **Provider registry + degradation ladder:** `providers.py` — the $0 invariant is
@@ -17,8 +37,8 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 - **ModelPlanner** (`planner_model.py`): the first model-backed Planner over the
   ladder — emits `provider.route` / `provider.attempt` / `provider.outcome` (the V3
   learned-router dataset starts here); scripted mode for tests/resume; the runner
-  catches exhausted ladders and parks with "no provider". Client pending: local
-  Ollama first, guard-gated.
+  catches exhausted ladders and parks with "no provider". Live now via the
+  guard-gated `ollama.py` client (see the milestone cluster above).
 - 27 new tests (guard 12, providers/planner 15); suite at 77 passing.
 - **`thoth briefing`** (Azaris-parity track, V1 item pulled forward): morning report
   generated from stored state only — parked runs (with resume commands), open work,
