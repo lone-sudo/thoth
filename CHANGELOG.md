@@ -4,6 +4,29 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — Qwen2.5-3B proof + planner/runner hardening (2026-09-28, later)
+- **Repeat-breaker** (`runner.py`): a repeat of a VERIFIED-OK idempotent action
+  parks the run before executing — turns the observed live loop (identical
+  file.read digest four turns running) into a diagnostic terminal state.
+  Within-episode scope; failing repeats stay under 3-strikes verify.
+- **Planner prompt fixes** (`planner_model.py`): tool lists now carry required
+  args (undocumented schemas were unguessable); turn history reaches the model
+  (the observation loop actually loops); tail instruction against re-acquiring
+  results already held.
+- **Output observations in checkpoints** (`runner.py`): turns carry a 200-char
+  observation (tool detail first, payload sample second) so the planner can
+  read what happened; digests alone cannot end a loop.
+- **Bounded retry**: `_ATTEMPTS_PER_PROVIDER = 2` — a stochastic model gets one
+  second chance before the ladder falls through; `provider.retry` events keep
+  it auditable; structural failures never retry.
+- Smoke driver: `--plain` mode (hint-free protocol benchmark, strict gate:
+  done AND ≥1 verified turn), bounds coherence, temp 0.4.
+- Journal: the 2.1GB windowed-download record (sha256-verified against HF LFS)
+  and the session's key finding — Qwen3B self-terminates on SEMANTIC result
+  lines, not raw payloads; per-tool result summarization is the V2 layer that
+  completes the self-driven run.
+- Suite at 102 passing; golden 38/38.
+
 ### Added — live local-brain milestone (2026-09-28)
 - **`ollama.py` client (the package's single I/O module):** gate-before-bytes
   (`guard.check_egress` on every probe/attempt), loopback-only endpoints, JSON

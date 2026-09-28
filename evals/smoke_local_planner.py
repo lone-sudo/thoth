@@ -8,11 +8,16 @@ is exercisable on any box. Every byte still crosses guard.check_egress.
 
   llama-server -m model.gguf --port 11434
 
-Usage: python -m evals.smoke_local_planner
+Usage:
+  python -m evals.smoke_local_planner          # mechanics demo (hint-fed goal)
+  python -m evals.smoke_local_planner --plain  # hint-free protocol-adherence test:
+                                               # no few-shot, no suggested plan;
+                                               # pass = status done AND >=1 verified tool turn
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -27,6 +32,7 @@ from thoth.planner_model import ModelPlanner, _CLIENTS  # private seam, journale
 WS = Path(__file__).resolve().parents[2]  # structural-rcc-suite-v4/
 TARGET = "local:llama-server@http://127.0.0.1:11434"
 _MODEL_NAME = "smollm2-135m"  # replaced by whatever /v1/models reports
+_FLAGS = {"fewshot": True}    # --plain turns the demo aids off
 
 
 def _guard_or_raise(conn) -> None:
@@ -51,7 +57,8 @@ def _shim_attempt(conn, prompt: str) -> str:
     """Same contract as ollama.attempt: guard first, then one local completion
     over llama-server's OpenAI-compatible /v1/chat/completions."""
     _guard_or_raise(conn)
-    prompt = FEWSHOT + prompt
+    if _FLAGS["fewshot"]:
+        prompt = FEWSHOT + prompt
     payload = {
         "model": _MODEL_NAME,
         "stream": False,
@@ -59,7 +66,7 @@ def _shim_attempt(conn, prompt: str) -> str:
             {"role": "system", "content": ollama.PLAN_SYSTEM},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.1,
+        "temperature": 0.4,
         "max_tokens": 150,
     }
     req = _urlrequest.Request(
@@ -106,6 +113,12 @@ def _seed(conn) -> None:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="Thoth end-to-end local-planner smoke")
+    ap.add_argument("--plain", action="store_true",
+                    help="hint-free protocol test: no few-shot, no suggested plan; "
+                         "pass = done AND >=1 verified tool turn")
+    plain = ap.parse_args().plain
+    _FLAGS["fewshot"] = not plain
     tmp = Path.home() / "AppData/Local/Temp/thoth-smoke-run.db"
     if tmp.exists():
         tmp.unlink()
@@ -127,24 +140,27 @@ def main() -> int:
 
     print("== 3. seed + start run ==")
     _seed(conn)
-    # Spoon-fed goal (journaled): tiny models parrot rather than adapt, so the
-    # goal carries an explicit suggested plan. Proves the MECHANICS (parse ->
-    # validate -> tool -> verify -> checkpoint -> done); protocol-following
-    # without hints needs a >=1.5B model (see journal 2026-W39).
-    sid = runner.start_run(
-        conn, "thoth",
-        'Read the file README.md. Suggested plan: {"tool": "file.read", '
-        '"args": {"path": "README.md"}, "summary": "read README.md", '
-        '"next_intent": "report and finish", "done": false}',
-        max_turns=4, tool_calls_budget=4)
+    if plain:
+        # Hint-free protocol test (journal 2026-W39): no few-shot, no suggested
+        # plan. Pure action goal — the pass bar is self-driven goal->action->done;
+        # answer synthesis (counting lines) needs a tool the V0 registry lacks.
+        goal = ("Read the file README.md in the workspace, then state in one "
+                "sentence what the project is.")
+    else:
+        # Mechanics demo (journaled): tiny models parrot rather than adapt, so
+        # the goal carries an explicit suggested plan.
+        goal = ('Read the file README.md. Suggested plan: {"tool": "file.read", '
+                '"args": {"path": "README.md"}, "summary": "read README.md", '
+                '"next_intent": "report and finish", "done": false}')
+    sid = runner.start_run(conn, "thoth", goal, max_turns=6, tool_calls_budget=6)
     print(f"   run {sid} created (project 'thoth')")
 
     print("== 4. execute: full ladder, real model plans each turn ==")
     registry = tools.default_registry()
     planner = ModelPlanner(conn, availability=avail, task_class="plan",
                            tool_registry=registry)
-    result = runner.execute_run(conn, sid, planner, registry, max_turns=4,
-                                tool_calls_budget=4)
+    result = runner.execute_run(conn, sid, planner, registry, max_turns=6,
+                                tool_calls_budget=6)
     print(f"   result: {result.status} ({result.reason})")
 
     # Pass criterion (journal 2026-W39): >=1 verified tool turn means the full
@@ -154,6 +170,8 @@ def main() -> int:
         "SELECT COUNT(*) AS n FROM events WHERE kind='run.turn.completed' "
         "AND json_extract(payload_json, '$.verify.ok') = 1").fetchone()["n"]
     print(f"   verified tool turns: {turns}")
+    if plain:
+        print(f"   plain gate: done={result.status == 'done'} turns={turns}")
 
     print("== 5. event trail ==")
     for row in conn.execute(
@@ -170,6 +188,8 @@ def main() -> int:
         print(f"   {row['kind']:<26} {brief}")
 
     conn.close()
+    if plain:
+        return 0 if (result.status == "done" and turns >= 1) else 1
     return 0 if turns >= 1 else 1
 
 

@@ -137,7 +137,7 @@ def runner_registry():
     r.register(ToolSpec(
         name="noop", description="always succeeds", permission_level=0,
         idempotent=True, privacy_floor=2,
-        input_schema={}, run=lambda **k: {"ok": True, "detail": "noop"},
+        input_schema={"n": "int"}, run=lambda **k: {"ok": True, "detail": "noop"},
         verify=lambda res: __import__("thoth.tools", fromlist=["VerifyReport"]).VerifyReport(True, "noop"),
     ))
     return r
@@ -156,7 +156,7 @@ def test_model_planner_parks_when_all_attempts_fail(conn):
 
 
 def test_model_planner_scripted_mode_plans(conn):
-    script = [("noop", {}), ("noop", {})]
+    script = [("noop", {}), ("noop", {"n": 2})]  # vary: repeat-breaker parks identical idempotent repeats
     run_id, result = _run(conn, ModelPlanner(conn, script=script))
     assert result.status == "done"
     turns = runner.history_of(conn, run_id)

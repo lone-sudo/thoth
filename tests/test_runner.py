@@ -16,11 +16,13 @@ def conn(tmp_path):
 
 def _registry_ok():
     reg = tools.default_registry()
-    # a bulletproof tool for happy-path tests
+    # a bulletproof tool for happy-path tests; optional "n" param lets tests
+    # vary args (repeat-breaker and digest-distinctness scenarios)
     reg.register(tools.ToolSpec(
         name="noop", description="always succeeds", permission_level=0,
-        idempotent=True, privacy_floor=0, input_schema={}, run=lambda **k: {"ok": True,
-        "detail": "noop"}, verify=lambda r: tools.VerifyReport(True, "noop"),
+        idempotent=True, privacy_floor=0, input_schema={"n": "int"},
+        run=lambda **k: {"ok": True, "detail": "noop"},
+        verify=lambda r: tools.VerifyReport(True, "noop"),
     ))
     return reg
 
@@ -29,7 +31,7 @@ def _registry_ok():
 
 def test_run_completes_via_noop_planner(conn):
     run_id = runner.start_run(conn, project="rcc", goal="probe the loop")
-    planner = runner.NoopPlanner(script=[("noop", {}), ("noop", {})])
+    planner = runner.NoopPlanner(script=[("noop", {}), ("noop", {"n": 2})])
     result = runner.execute_run(conn, run_id, planner, _registry_ok())
     assert result.status == "done"
     turns = runner.history_of(conn, run_id)
@@ -50,8 +52,14 @@ def test_max_turns_parks_the_run(conn):
     reg = _registry_ok()
 
     class EndlessPlanner:
+        # args vary per call: the repeat-breaker (identical idempotent repeats)
+        # would park first, and this test's subject is the max-turns bound.
+        def __init__(self):
+            self.calls = 0
+
         def decide(self, context, history):
-            return runner.Plan(tool="noop", args={}, summary="go")
+            self.calls += 1
+            return runner.Plan(tool="noop", args={"n": self.calls}, summary="go")
 
     result = runner.execute_run(conn, run_id, EndlessPlanner(), reg, max_turns=5,
                                 tool_calls_budget=100)
@@ -64,8 +72,13 @@ def test_budget_parks_the_run(conn):
     reg = _registry_ok()
 
     class EndlessPlanner:
+        # args vary per call: see the repeat-breaker note in the max-turns test.
+        def __init__(self):
+            self.calls = 0
+
         def decide(self, context, history):
-            return runner.Plan(tool="noop", args={}, summary="go")
+            self.calls += 1
+            return runner.Plan(tool="noop", args={"n": self.calls}, summary="go")
 
     result = runner.execute_run(conn, run_id, EndlessPlanner(), reg, max_turns=100,
                                 tool_calls_budget=3)
@@ -137,7 +150,9 @@ def test_resume_carries_bounds_and_completes(conn):
         def decide(self, context, history):
             self.calls += 1
             if self.calls <= 4:
-                return runner.Plan(tool="noop", args={}, summary="go")
+                # varying args: identical consecutive idempotent repeats are
+                # parked by the repeat-breaker before this crash can happen
+                return runner.Plan(tool="noop", args={"n": self.calls}, summary="go")
             raise KeyboardInterrupt  # simulate mid-run crash after 4 turns
 
     with pytest.raises(KeyboardInterrupt):
@@ -160,6 +175,59 @@ def test_resume_carries_bounds_and_completes(conn):
     # 4 turns happened pre-crash; bounds carried from checkpoint (50), so the
     # resumed turn is allowed.
     assert len(runner.history_of(conn, run_id)) == 5
+
+
+# ------------------------------------------------------------------ repeat-breaker
+
+def test_repeat_breaker_parks_identical_idempotent_repeat(conn):
+    """Live finding (journal 2026-W39): a model loops forever on a successful
+    pointless action. Two identical idempotent turns in one episode -> park
+    before the second executes."""
+    run_id = runner.start_run(conn, project="rcc", goal="loop on success")
+    planner = runner.NoopPlanner(script=[("noop", {}), ("noop", {})])
+    result = runner.execute_run(conn, run_id, planner, _registry_ok(),
+                                max_turns=10, tool_calls_budget=10)
+    assert result.status == "parked"
+    assert "repeat-breaker" in result.reason
+    turns = runner.history_of(conn, run_id)
+    assert len(turns) == 1  # the second identical call never executed
+
+
+def test_repeat_breaker_allows_non_idempotent_and_varying_args(conn):
+    run_id = runner.start_run(conn, project="rcc", goal="same call, non-idempotent")
+    reg = _registry_ok()
+    reg.register(tools.ToolSpec(
+        name="tick", description="not idempotent", permission_level=0,
+        idempotent=False, privacy_floor=0, input_schema={},
+        run=lambda **k: {"ok": True, "detail": "tick"},
+        verify=lambda r: tools.VerifyReport(True, "tick")))
+    result = runner.execute_run(conn, run_id,
+                                runner.NoopPlanner(script=[("tick", {}), ("tick", {})]),
+                                reg, max_turns=10, tool_calls_budget=10)
+    assert result.status == "done"
+
+    run_id2 = runner.start_run(conn, project="rcc", goal="varying args")
+    result2 = runner.execute_run(
+        conn, run_id2,
+        runner.NoopPlanner(script=[("noop", {"n": 1}), ("noop", {"n": 2})]),
+        _registry_ok(), max_turns=10, tool_calls_budget=10)
+    assert result2.status == "done"
+
+
+def test_repeat_breaker_fresh_per_episode(conn):
+    """Deliberately re-running the same action across a resume is a designed
+    ADR-003 pattern (continuation); the breaker must not trip cross-episode."""
+    run_id = runner.start_run(conn, project="rcc", goal="resume continuation")
+    reg = _registry_ok()
+    runner.execute_run(conn, run_id,
+                       runner.NoopPlanner(script=[("noop", {})]),
+                       reg, max_turns=50, tool_calls_budget=50)
+    conn.execute("UPDATE runs SET status='parked' WHERE id=?", (run_id,))
+    conn.commit()
+    result = runner.resume_run(conn, "rcc",
+                               lambda goal, history: runner.NoopPlanner(script=[("noop", {})]),
+                               reg, max_turns=50, tool_calls_budget=50)
+    assert result.status == "done"  # same action as the prior episode: allowed
 
 
 def test_resume_without_parked_run_raises(conn):

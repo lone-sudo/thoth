@@ -38,6 +38,11 @@ _CLIENTS: dict[str, Any] = {
     "ollama-local": ollama.attempt,
 }
 
+# Sampling-variance budget (journal 2026-W39): a stochastic local model can emit
+# one malformed/invalid answer on an otherwise-capable day. Retry the SAME
+# candidate before falling through — structural failures (no client) never retry.
+_ATTEMPTS_PER_PROVIDER = 2
+
 
 class ModelPlanner:
     """Ladder-driven planner. Conforms to runner.Planner (decide(context, history))."""
@@ -101,20 +106,31 @@ class ModelPlanner:
                 "auth_type": spec.auth_type,
             })
             self._conn.commit()
-            try:
-                answer = self._attempt(spec, context)
-                plan_dict = ollama.plan_from_json(answer)
-                plan = self._to_plan(plan_dict, spec)
-            except providers.ProviderUnavailable as exc:
-                failures.append(f"{spec.name}: {exc}")
-                self._outcome(spec, "unavailable", str(exc))
-                continue
-            except ollama.OllamaUnavailable as exc:
-                failures.append(f"{spec.name}: {exc}")
-                self._outcome(spec, "error", str(exc))
-                continue
-            self._outcome(spec, "ok", plan_dict.get("summary", ""))
-            return plan
+            attempts_left = _ATTEMPTS_PER_PROVIDER
+            while attempts_left > 0:
+                attempts_left -= 1
+                try:
+                    answer = self._attempt(spec, context, history)
+                    plan_dict = ollama.plan_from_json(answer)
+                    plan = self._to_plan(plan_dict, spec)
+                except providers.ProviderUnavailable as exc:
+                    failures.append(f"{spec.name}: {exc}")
+                    self._outcome(spec, "unavailable", str(exc))
+                    break  # structural — retrying cannot help
+                except ollama.OllamaUnavailable as exc:
+                    failures.append(f"{spec.name}: {exc}")
+                    self._outcome(spec, "error", str(exc))
+                    if attempts_left:
+                        emit(self._conn, "provider.retry", {
+                            "task_class": self._task_class,
+                            "provider": spec.name,
+                            "attempts_left": attempts_left,
+                            "reason": str(exc)[:200],
+                        })
+                        self._conn.commit()
+                    continue
+                self._outcome(spec, "ok", plan_dict.get("summary", ""))
+                return plan
 
         raise PlannerUnavailable(
             f"all {len(candidates)} candidate(s) unavailable for "
@@ -122,7 +138,8 @@ class ModelPlanner:
 
     # -- pieces ------------------------------------------------------------------
 
-    def _attempt(self, spec: providers.ProviderSpec, context: str) -> str:
+    def _attempt(self, spec: providers.ProviderSpec, context: str,
+                 history: list[dict[str, Any]] | None = None) -> str:
         """One model call for one ladder candidate. Cloud providers raise
         ProviderUnavailable (no clients, $0-structural); the local provider goes
         through the guard-gated ollama client."""
@@ -131,18 +148,40 @@ class ModelPlanner:
             if client is None:
                 raise providers.ProviderUnavailable(
                     f"local provider '{spec.name}' has no client registered")
-            prompt = self._build_prompt(context)
+            prompt = self._build_prompt(context, history)
             return client(self._conn, prompt)
         return providers.attempt(spec)  # cloud: raises, honestly
 
-    def _build_prompt(self, context: str) -> str:
+    def _build_prompt(self, context: str,
+                      history: list[dict[str, Any]] | None = None) -> str:
         tool_lines = []
         if self._tools is not None:
             for spec in self._tools.all():
-                tool_lines.append(f"- {spec.name}: {spec.description}")
+                req = ", ".join(sorted(spec.required)) if spec.required else ""
+                suffix = f" (required args: {req})" if req else ""
+                tool_lines.append(f"- {spec.name}: {spec.description}{suffix}")
         tools_block = "\n".join(tool_lines) if tool_lines else "- (tool list unavailable)"
-        return ("CONTEXT:\n" + context + "\n\nTOOL LIST:\n" + tools_block +
-                "\n\nDecide the next single action. Reply with the JSON plan only.")
+        out = ["CONTEXT:\n", context, "\n\nTOOL LIST:\n", tools_block]
+        if history:
+            lines = []
+            for i, turn in enumerate(history, 1):
+                tool = turn.get("tool") or "(finish)"
+                verify = turn.get("verify") or {}
+                ok = verify.get("ok") if isinstance(verify, dict) else None
+                note = "ok" if ok else "failed"
+                # outcome first: the model finishes when it can read what happened
+                # (live finding, journal 2026-W39); older checkpoints fall back
+                note_txt = str(turn.get("output") or turn.get("summary")
+                               or turn.get("next_intent") or "")
+                lines.append(f"  turn {i}: {tool} [{note}] "
+                             f"{note_txt[:100]}")
+            out.append("\n\nPREVIOUS TURNS (already executed and verified):\n"
+                       + "\n".join(lines))
+        out.append("\n\nDecide the next single action. Results of previous "
+                   "turns appear under PREVIOUS TURNS - never repeat an action "
+                   "to obtain a result you already have. If the goal is already "
+                   "achieved, set done=true. Reply with the JSON plan only.")
+        return "".join(out)
 
     def _to_plan(self, plan_dict: dict[str, Any],
                  spec: providers.ProviderSpec) -> Plan:

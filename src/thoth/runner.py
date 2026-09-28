@@ -275,9 +275,15 @@ def execute_run(
     run = current_run(conn)  # bounds may come from the row; params are the ceiling
     project = run["project"] if run else None
     goal = (run["goal"] if run else "") or ""
-    turns_used = len(history_of(conn, run_id))
+    prior = history_of(conn, run_id)
+    turns_used = len(prior)
     tool_calls_used = turns_used
     verify_failures = 0
+    # Repeat-breaker state (journal 2026-W39), scoped to THIS episode: repetition
+    # detection polices an in-run model loop; deliberately re-running an action
+    # across a resume (a designed ADR-003 pattern) must not trip it. Cross-
+    # invocation loops remain bounded per invocation.
+    last_digest: str | None = None
 
     while True:
         # --- bounds (enforced by the runner, never the model) ---------------
@@ -311,6 +317,17 @@ def execute_run(
             conn.commit()
             return _park(conn, run_id, project, f"invalid tool args: {exc}")
 
+        # --- repeat-breaker (journal 2026-W39): a model can loop forever on a
+        # successful-but-pointless action (observed live: identical file.read
+        # digest four turns running). Repeating a VERIFIED-OK idempotent action
+        # adds zero information — park diagnostically before executing it again.
+        # Failing idempotent repeats stay under the 3-strikes verify regime:
+        # retrying a flaky failure can still earn information.
+        digest = _digest(clean_args)
+        if digest == last_digest and spec.idempotent:
+            return _park(conn, run_id, project,
+                         "repeat-breaker: identical idempotent action repeated")
+
         result = spec.run(**clean_args)
         tool_calls_used += 1
         turns_used += 1
@@ -319,6 +336,7 @@ def execute_run(
         report: VerifyReport = spec.verify(result)
         if report.ok:
             verify_failures = 0
+            last_digest = digest  # only verified-ok actions arm the breaker
         else:
             verify_failures += 1
             if verify_failures >= PARK_LIMIT:
@@ -326,11 +344,20 @@ def execute_run(
                              f"verify failed {PARK_LIMIT}x: {report.detail}")
 
         # --- checkpoint -------------------------------------------------------
+        # Output observation (journal 2026-W39): the planner must SEE what a
+        # turn produced, and completeness is the signal that ends loops — a raw
+        # truncated prefix reads as "incomplete document" and invites re-reading.
+        # Lead with the tool's own summary (detail), then a payload sample.
+        detail = str(result.get("detail") or "")
+        payload = str(result.get("output") or result.get("content") or "")
+        room = max(0, 200 - len(detail) - 3)
+        snippet = f"{detail} | {payload[:room]}" if payload else detail
         emit(conn, K_TURN_COMPLETED, {
             "run_id": run_id,
             "turn": turns_used,
             "tool": plan.tool,
             "tool_args_digest": _digest(clean_args),
+            "output": snippet,
             "verify": {"ok": report.ok, "detail": report.detail},
             "context_sections": sizes,
             "next_intent": plan.next_intent,
