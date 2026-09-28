@@ -143,12 +143,13 @@ def test_plan_from_json_still_rejects_leading_prose_without_object():
 # ------------------------------------------------------------------ CI whitelist integrity
 
 def test_urllib_only_in_ollama_module():
-    """The no-bypass scan's whitelist is exactly one file: ollama.py."""
+    """The no-bypass scan's whitelist is exactly two I/O modules: ollama.py
+    (providers) and telegram.py (the surface) — guard.py gates them both."""
     from pathlib import Path
     src_root = Path(__file__).resolve().parents[1] / "src" / "thoth"
     offenders = []
     for p in src_root.rglob("*.py"):
-        if p.name in ("ollama.py",):
+        if p.name in ("ollama.py", "telegram.py"):
             continue
         text = p.read_text(encoding="utf-8")
         if "urllib.request" in text or "urlopen" in text:

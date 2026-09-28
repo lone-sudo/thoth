@@ -104,10 +104,11 @@ def test_every_decision_is_one_event(guard_, conn):
 # ------------------------------------------------------------------ CI no-bypass
 
 def _project_src() -> list[Path]:
-    """Every module that must contain no network primitives. Exactly two files
-    may: guard.py (the gate) and ollama.py (the one I/O module it gates)."""
+    """Every module that must contain no network primitives. Exactly three files
+    may: guard.py (the gate), ollama.py (providers), telegram.py (the surface
+    it gates — ADR-005)."""
     root = Path(__file__).resolve().parents[1] / "src" / "thoth"
-    allowed = {"guard.py", "ollama.py"}
+    allowed = {"guard.py", "ollama.py", "telegram.py"}
     return [p for p in root.rglob("*.py") if p.name not in allowed]
 
 
@@ -138,3 +139,39 @@ def test_guard_module_uses_no_network_itself():
         encoding="utf-8")
     assert "urlopen" not in src and "socket.socket" not in src
     assert "subprocess" not in src  # the guard never executes anything either
+
+
+# ------------------------------------------------- surface branch (ADR-005)
+
+def test_surface_egress_exact_host_allowed(conn):
+    g = Guard(conn, actor="test")
+    d = g.check_egress("surface", "https://api.telegram.org/bot123:AA/getUpdates")
+    assert d.allowed
+    assert d.rule == "surface-endpoint-allowlist"
+
+
+def test_surface_egress_lookalike_hosts_denied(conn):
+    g = Guard(conn, actor="test")
+    for target in (
+        "https://api.telegram.org.evil.io/botX/getMe",
+        "https://api.telegram-org.com/botX/getMe",
+        "https://evil.io/api.telegram.org/botX/getMe",
+        "http://api.telegram.org/botX/getMe",      # plaintext downgraded
+        "https://telegram.org/botX/getMe",         # wrong host entirely
+    ):
+        d = g.check_egress("surface", target)
+        assert not d.allowed, target
+
+
+def test_surface_egress_unknown_kind_fails_closed(conn):
+    g = Guard(conn, actor="test")
+    d = g.check_egress("carrier-pigeon", "https://api.telegram.org/x")
+    assert not d.allowed
+
+
+def test_telegram_imports_no_registry_or_runner():
+    """ADR-005 §4: the surface relays decisions; it never grants or makes them."""
+    src = (Path(__file__).resolve().parents[1] / "src" / "thoth" / "telegram.py").read_text(
+        encoding="utf-8")
+    assert "ToolRegistry" not in src and "default_registry" not in src
+    assert "from .runner" not in src and "import runner" not in src

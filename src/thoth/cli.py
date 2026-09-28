@@ -256,6 +256,40 @@ def cmd_run(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_telegram(args: argparse.Namespace) -> int:
+    """ADR-005 surface entry: one-shot delivery or the bounded poll loop."""
+    from thoth import telegram as tg
+
+    conn = _connect(args)
+    try:
+        if args.tg_cmd == "send-briefing":
+            s = tg.build_surface(conn)
+            s.deliver_briefing(getattr(args, "project", None))
+            print("briefing delivered")
+            return 0
+        if args.tg_cmd == "send-digest":
+            s = tg.build_surface(conn)
+            s.deliver_digest(getattr(args, "project", None))
+            print("digest delivered")
+            return 0
+        if args.tg_cmd == "serve":
+            print("serving; Ctrl-C stops (every poll is a guard-decided, "
+                  "logged crossing)")
+            tg.serve(conn, max_cycles=args.max_cycles)
+            print("serve ended")
+            return 0
+        print("unknown telegram subcommand", file=sys.stderr)
+        return 2
+    except tg.SurfaceConfigError as exc:
+        print(f"config error: {exc}", file=sys.stderr)
+        return 2
+    except tg.SurfaceUnavailable as exc:
+        print(f"surface unavailable (event logged): {exc}", file=sys.stderr)
+        return 1
+    finally:
+        conn.close()
+
+
 def cmd_briefing(args: argparse.Namespace) -> int:
     conn = _connect(args)
     try:
@@ -391,6 +425,21 @@ def build_parser() -> argparse.ArgumentParser:
     dp.add_argument("--today", help="override today as YYYY-MM-DD (testing)")
     dp.add_argument("--json", action="store_true")
     dp.set_defaults(func=cmd_digest)
+
+    tp = sub.add_parser("telegram", help="Telegram surface (ADR-005): send/serve"
+                                          " — token+chat via THOTH_TG_TOKEN/THOTH_TG_CHAT")
+    tsub = tp.add_subparsers(dest="tg_cmd", required=True)
+    tsp = tsub.add_parser("send-briefing", help="deliver the morning briefing once")
+    tsp.add_argument("--project")
+    tsp.set_defaults(func=cmd_telegram)
+    tsp = tsub.add_parser("send-digest", help="deliver the end-of-day digest once")
+    tsp.add_argument("--project")
+    tsp.set_defaults(func=cmd_telegram)
+    tsp = tsub.add_parser("serve", help="poll loop: deliver reports, render approval cards")
+    tsp.add_argument("--project")
+    tsp.add_argument("--max-cycles", type=int, default=None,
+                     help="bound the loop (testing; default: until Ctrl-C)")
+    tsp.set_defaults(func=cmd_telegram)
 
     return p
 

@@ -1,10 +1,13 @@
 """The security choke point (ADR-004): one fail-closed guard for every
 consequential crossing.
 
-Egress policy (post local-branch):
-- `provider` crossings to **`local:` targets** are ALLOWED — the one planned
-  branch (ADR-004 §2). The caller module (ollama.py) owns loopback enforcement;
-  the guard owns the *decision* and its event.
+Egress policy (post surface branch, ADR-005):
+- `provider` crossings to **`local:` targets** are ALLOWED — the local model
+  path (Ollama on loopback; the caller module enforces loopback, the guard
+  enforces the decision and logs it).
+- `surface` crossings to **exactly** `https://api.telegram.org` are ALLOWED —
+  the second surface's transport (ADR-005 §1); lookalike hosts, other hosts,
+  and plaintext downgrades are denied by the same rule.
 - Every other egress — cloud providers, generic network — stays DENIED: cloud
   spend branches land with the provider registry and are unoverridable.
 
@@ -23,6 +26,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from .events import emit
 
@@ -36,8 +40,13 @@ DENY = "deny"
 KIND_TOOL = "tool"
 KIND_NETWORK = "network"      # any outbound network call
 KIND_PROVIDER = "provider"    # outbound AI request (subset of network)
+KIND_SURFACE = "surface"      # outbound surface delivery (ADR-005: Telegram)
 
 LOCAL_TARGET_PREFIX = "local:"  # e.g. "local:ollama@http://127.0.0.1:11434"
+
+# ADR-005 §1: the surface's exact-host allowlist. Lookalike hosts and scheme
+# downgrades fail the tuple match; there is no wildcard and no exception path.
+SURFACE_ALLOWED_HOSTS = ("api.telegram.org",)
 
 # Privacy classes (ADR-004): higher = more sensitive. Default for data of
 # unknown provenance is PRIVATE (fail closed). SENSITIVE is local-only and
@@ -132,14 +141,31 @@ class Guard:
 
     def check_egress(self, kind: str, target: str,
                      data_class: int = PUBLIC) -> Decision:
-        """Egress gate. Exactly one allow-rule exists:
+        """        Egress gate. Exactly two allow-rules exist:
 
         `provider` crossings whose target starts with ``local:`` — the local
         model path (Ollama on loopback; the caller module enforces loopback,
-        the guard enforces the decision and logs it). Cloud providers and all
-        generic network egress stay DENIED: the spend-guard branches land with
-        the provider registry and are unoverridable (ADR-004 §2).
+        the guard enforces the decision and logs it).
+
+        `surface` crossings to exactly ``https://api.telegram.org`` — the
+        Telegram surface transport (ADR-005); exact host + https only.
+
+        Cloud providers and all generic network egress stay DENIED: the
+        spend-guard branches land with the provider registry and are
+        unoverridable (ADR-004 §2).
         """
+        if kind == KIND_SURFACE:
+            parts = urlparse(target) if isinstance(target, str) else None
+            if (parts is not None and parts.scheme == "https"
+                    and (parts.hostname or "") in SURFACE_ALLOWED_HOSTS):
+                return self._decide(
+                    KIND_SURFACE, ALLOW, "surface-endpoint-allowlist",
+                    "exact allowlisted surface host over https",
+                    target=target, data_class=data_class)
+            return self._decide(
+                KIND_SURFACE, DENY, "surface-endpoint-allowlist",
+                "only https://api.telegram.org is allowlisted (exact host)",
+                target=target, data_class=data_class)
         if kind == KIND_PROVIDER:
             if isinstance(target, str) and target.startswith(LOCAL_TARGET_PREFIX):
                 return self._decide(

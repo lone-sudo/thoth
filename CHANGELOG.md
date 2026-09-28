@@ -4,6 +4,25 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — Telegram surface implemented (2026-09-28, latest)
+- **`telegram.py` — the third I/O module (ADR-005 V1.5):** guard-allowlisted
+  transport (exact-host `api.telegram.org`, https-only — lookalikes and
+  plaintext downgrades denied), token from env (never the repo, redacted in
+  every event), chat-id allowlist with logged rejections, briefing/digest
+  delivery behind `apply_privacy_ceiling` (PRIVATE renders as counts,
+  SENSITIVE withholds), approval-card plumbing with fail-closed expiry
+  (timeout = reject), bounded audited polling, delivery failures degrade to
+  `surface.delivery_failed` events and never crash. Zero ToolSpecs — the
+  surface grants nothing it does not already have.
+- Guard gains the `surface` crossing kind: exactly two allow-rules now exist
+  (`local:` providers, allowlisted surface hosts).
+- CLI: `thoth telegram send-briefing|send-digest|serve [--max-cycles]`.
+- CI: no-bypass whitelist is exactly three files (guard/ollama/telegram) and
+  telegram.py may import neither the tool registry nor the runner.
+- 16 new tests (token hygiene, deny-closed, ceiling, cards, allowlisted
+  polling); suite at 129, golden 38/38. Live activation pending the
+  operator's bot token.
+
 ### Added — ADR-005 (2026-09-28, latest)
 - **ADR-005 (proposed): Telegram as Thoth's second surface** — Bot API briefing
   and digest delivery, fail-closed approval cards for
