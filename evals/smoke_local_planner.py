@@ -34,7 +34,8 @@ TARGET = "local:llama-server@http://127.0.0.1:11434"
 PLAIN_GOAL = ("Read the file README.md in the workspace, then state in one "
               "sentence what the project is.")
 _MODEL_NAME = "smollm2-135m"  # replaced by whatever /v1/models reports
-_FLAGS = {"fewshot": True}    # --plain turns the demo aids off
+_FLAGS = {"fewshot": True, "temperature": 0.4}
+# --plain turns the aids off; the model matrix pins temperature (evals/model_matrix.py)
 
 
 def _guard_or_raise(conn) -> None:
@@ -71,7 +72,7 @@ def _shim_attempt(conn, prompt: str, system: str | None = None) -> str:
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
-        "temperature": 0.4,
+        "temperature": _FLAGS["temperature"],
         "max_tokens": 150,
     }
     req = _urlrequest.Request(
