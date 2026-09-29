@@ -30,6 +30,12 @@ from urllib.error import URLError  # noqa: F401  (re-exported for tests to patch
 from .guard import Guard, KIND_PROVIDER, PUBLIC
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
+# The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29):
+# Qwen2.5-3B-Instruct — the only candidate that passed the model matrix
+# (evals/model_matrix.py: 100% JSON validity, 100% tool turns, 100% earned
+# finishes at n=5, temperature 0.2; the admissibility gate is json% = tool% =
+# 100%). Changing this constant re-opens the V3 decision: run the matrix on
+# the new candidate first, then update the decision record, then this tag.
 DEFAULT_MODEL = "qwen2.5:3b-instruct"
 _TIMEOUT_S = 60
 

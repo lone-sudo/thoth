@@ -4,6 +4,15 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — V3 decision wired into production routing (2026-09-29, latest)
+- `ollama.DEFAULT_MODEL` (`qwen2.5:3b-instruct`) now carries the decision's
+  provenance: a comment binding it to the ROADMAP record and the matrix gate,
+  with the re-decision procedure stated (run the matrix, update the record,
+  then change the tag). The `ollama-local` provider description names
+  Qwen2.5-3B-Instruct and "matrix-gated". Two pin tests: the constant equals
+  the recorded selection, and the declared provider carries it — a silent
+  model swap now fails CI instead of drifting from the decision record.
+
 ### Added — anti-hollow-finish floor (2026-09-29, latest)
 - **Runner policy:** a done claim with zero verified tool turns is refused —
   the run parks diagnostically (`finish floor: done claimed with zero verified

@@ -155,6 +155,26 @@ def test_model_planner_parks_when_all_attempts_fail(conn):
     assert "no provider" in result.reason and "ollama-local" in result.reason
 
 
+# ------------------------------------------------------------------ V3 decision pins
+
+def test_default_planner_model_is_the_v3_decision():
+    """The V3 decision record (docs/ROADMAP.md, 2026-09-29) selects
+    Qwen2.5-3B-Instruct as the planner brain — the only matrix-passing
+    candidate (json% = tool% = 100%, journal 2026-W39). Production routing
+    must match the recorded decision; changing DEFAULT_MODEL re-opens V3:
+    run the matrix first, update the record, then this pin."""
+    from thoth import ollama
+    assert ollama.DEFAULT_MODEL == "qwen2.5:3b-instruct"
+
+
+def test_local_provider_declares_the_decision():
+    """The declared local provider names the selected brain and points at the
+    gate that selected it (discoverability without reading the ADRs)."""
+    spec = providers.default_registry().get("ollama-local")
+    assert "Qwen2.5-3B-Instruct" in spec.description
+    assert "matrix-gated" in spec.description
+
+
 def test_model_planner_scripted_mode_plans(conn):
     script = [("noop", {}), ("noop", {"n": 2})]  # vary: repeat-breaker parks identical idempotent repeats
     run_id, result = _run(conn, ModelPlanner(conn, script=script))
