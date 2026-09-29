@@ -4,6 +4,16 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — V3 planner-model decision recorded (2026-09-29, latest)
+- ROADMAP V3+ gains a decision record: **Qwen2.5-3B-Instruct (Q4_K_M, local)
+  is Thoth's default planner brain**, evidenced by the stabilized model matrix
+  and gated by an admissibility rule — json% = tool% = 100% over the matrix
+  protocol (Wilson bounds reported) before anything routes to a model. New
+  candidate GGUFs earn a row in the same protocol; revisit triggers: a smaller
+  model passing the gate, failures on new goal families, runner policy changes
+  such as the anti-hollow-finish floor. Local-floor scope only — the $0
+  structural invariant is untouched.
+
 ### Added — model matrix eval, stabilized (2026-09-29, latest)
 - **`evals/model_matrix.py`** — one row per local model, four protocol scores:
   JSON validity, tool-turn rate, park cleanliness, self-finish. Swaps

@@ -36,7 +36,8 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
       day one, *used* in V3 *(provider.route / provider.attempt / provider.outcome
       events now emitted by the ModelPlanner; latency arrives with the first client)*
 - [ ] One provider, manual override; no learned routing *(planner exists; client
-      pending — Ollama local first, guard-gated)*
+      pending — Ollama local first, guard-gated; planner model selected:
+      qwen2.5-3b, per the V3+ decision record below)*
 
 ## V1 — the operating layer
 
@@ -72,3 +73,38 @@ defense) — lands together with the provider registry, not after.*
 
 Learned routing (from V0.2 logs), claim verification pipeline, official platform
 producers, voice, cross-machine autonomy, vertical skill packs, product packaging.
+
+### Decision record — V3 planner model (2026-09-29)
+
+**Decision: Qwen2.5-3B-Instruct (Q4_K_M, local) is Thoth's default planner
+brain.** Evidence: the model matrix (`evals/model_matrix.py`; protocol: 5
+episodes/model, temperature pinned 0.2, Wilson 95% intervals, hint-free
+`--plain` goal — full protocol in `docs/journal/2026-W39.md`):
+
+| model         |  n |          json% |          tool% |         clean% |        finish% |
+| smollm2-135m  |  5 |    83% [44,97] |      0% [0,43] |  100% [57,100] |  100% [57,100] |
+| smollm2-360m  |  5 |      8% [1,35] |     20% [4,62] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+
+Rationale: qwen2.5-3b is the only candidate that both adheres to the protocol
+and *acts* — a verified tool turn in every episode, then a semantic finish on
+the evidence. qwen2.5-0.5b is the documented trap: protocol-perfect JSON and a
+100% finish rate with zero acting; on finish% alone it ties the worker, only
+tool% separates them. The SmolLM2 pair fails earlier (JSON validity; the 360m's
+`args`-as-list malformation is deterministic). All parks clean on all four:
+across 20 episodes the runner's degradation ladder diagnosed every failure and
+never crashed.
+
+Selection rule going forward: a planner model is admissible only when every
+matrix episode shows a parsed plan and ≥1 verified tool turn (json% = tool% =
+100%, Wilson bounds reported alongside); any new candidate GGUF earns a row in
+the same protocol before it can be routed to. The matrix is the acceptance
+gate; this table is its first verdict. Cloud alternatives stay structurally
+disabled (ProviderSpec $0 invariant) — this decision selects within the local
+floor only.
+
+Revisit triggers: a smaller model reaching 100/100 on the matrix (better $0
+hardware floor); matrix failures on new goal families (generalization beyond
+README-reading); runner-side policy changes such as the anti-hollow-finish
+floor that would re-rank the small models.
