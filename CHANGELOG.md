@@ -4,6 +4,18 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — self-serve gate auditions (2026-09-29, latest)
+- **`--add KEY GGUF_PATH PARAMS` on the model matrix** (ADR-006 Open Question
+  4 was about pinning the catalog; this answers the audition ergonomics): a
+  candidate GGUF anywhere on disk is resolved, checked against duplicate keys
+  and the decision-reserved `qwen2.5-3b` tag, run through the standard
+  protocol (5 episodes, pinned 0.2), and given an explicit gate verdict with
+  the next step printed — PASS points at the decision record + pin, FAIL
+  states "not routable; the matrix row is the evidence". Zero code edits to
+  audition; persistence stays deliberate. Verified live (qwen3b-recheck:
+  PASS at n=1). Gate pieces unit-tested offline including both full
+  `main()` flows with the server monkeypatched; suite 157, golden 38/38.
+
 ### Added — ADR-006 (2026-09-29, latest)
 - **ADR-006 (proposed): the model-selection gate** — the matrix protocol as
   the only path by which a model becomes routable (5 episodes/model, pinned

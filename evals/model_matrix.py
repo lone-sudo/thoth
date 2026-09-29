@@ -27,6 +27,10 @@ Usage:
   python -m evals.model_matrix                    # all four models, 5 episodes
   python -m evals.model_matrix --models qwen2.5-3b
   python -m evals.model_matrix --json             # machine rows + episodes
+  python -m evals.model_matrix --add cand /path/to.gguf 1.5B
+                                                  # ADR-006 audition: a new
+                                                  # candidate through the gate,
+                                                  # no code edits
 """
 
 from __future__ import annotations
@@ -54,12 +58,15 @@ PORT = 11434
 
 # One row per model: the same four GGUFs the smoke session downloaded and
 # sha-verified (journal 2026-W39). Floor-first, capability ascending.
+# gguf is resolved at import (see _resolve_gguf): SMOKE_DIR-relative files,
+# absolute paths for candidates added via --add.
 MODELS: list[dict[str, str]] = [
     {"key": "smollm2-135m", "file": "model.gguf", "params": "135M"},
     {"key": "smollm2-360m", "file": "model360.gguf", "params": "360M"},
     {"key": "qwen2.5-0.5b", "file": "qwen05b.gguf", "params": "0.5B"},
     {"key": "qwen2.5-3b", "file": "qwen3b.gguf", "params": "3B"},
 ]
+
 
 EPISODES_PER_MODEL = 5
 # Pinned sampling temperature for every matrix episode (journal 2026-W39):
@@ -100,6 +107,50 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 # server swap
 # ---------------------------------------------------------------------------
+
+def _resolve_gguf(file_name: str) -> Path:
+    """Catalog GGUFs live in the smoke dir; absolute paths pass through."""
+    p = Path(file_name)
+    return p if p.is_absolute() else SMOKE_DIR / p
+
+
+MODELS = [dict(row, gguf=str(_resolve_gguf(row["file"]))) for row in MODELS]
+
+
+# ---------------------------------------------------------------------------
+# ADR-006 gate: self-serve candidate auditions (--add)
+# ---------------------------------------------------------------------------
+
+def _candidate_entry(key: str, gguf_arg: str, params: str) -> dict[str, str]:
+    """Resolve a --add candidate into a matrix entry without touching the
+    committed catalog: the GGUF may live anywhere (absolute path), collisions
+    with existing keys and with the canonical qwen2.5-3b tag are refused."""
+    if any(m["key"] == key for m in MODELS):
+        print(f"refusing duplicate key '{key}': already in the matrix catalog")
+        raise SystemExit(2)
+    if key == "qwen2.5-3b":
+        # The recorded decision's tag; re-auditioning under the same name would
+        # blur the evidence trail. Use a distinct key (e.g. qwen3b-recheck).
+        print("refusing key 'qwen2.5-3b': reserved by the V3 decision record")
+        raise SystemExit(2)
+    path = Path(gguf_arg)
+    if not path.is_file():
+        print(f"GGUF not found: {path}")
+        raise SystemExit(2)
+    return {"key": key, "file": path.name, "params": params,
+            "gguf": str(path.resolve())}
+
+
+def gate_verdict(row: dict) -> str:
+    """The ADR-006 §4 admissibility rule, as code: a planner model is
+    admissible only when json% = tool% = 100% over the matrix protocol
+    (n >= 1; Wilson bounds are reported alongside by the table)."""
+    if int(row.get("n", 0)) < 1:
+        return "incomplete"
+    if row["json_validity"] == 1.0 and row["tool_turn_rate"] == 1.0:
+        return "PASS"
+    return "FAIL"
+
 
 def _swap_model(server: Path, gguf: Path, port: int = PORT) -> None:
     """Restart llama-server pinned to exactly one GGUF; wait until /v1/models
@@ -282,7 +333,7 @@ def score_model(episodes: list[dict]) -> dict:
 def render_table(rows: list[dict]) -> str:
     """Fixed-width table; one line per model, floor-first, with Wilson 95%
     intervals on every rate (journal 2026-W39: n=5 rows state their error)."""
-    header = (f"| {'model':<13} | {'n':>2} | {'json%':>14} | {'tool%':>14} | "
+    header = (f"| {'model':<14.14} | {'n':>2} | {'json%':>14} | {'tool%':>14} | "
               f"{'clean%':>14} | {'finish%':>14} |")
     lines = [header, "|" + "-" * (len(header) - 2) + "|"]
 
@@ -293,7 +344,7 @@ def render_table(rows: list[dict]) -> str:
 
     for row in rows:
         lines.append(
-            f"| {str(row['model']):<13} | {int(row['n']):>2} "
+            f"| {str(row['model']):<14.14} | {int(row['n']):>2} "
             f"| {_cell(row, 'json_validity')} "
             f"| {_cell(row, 'tool_turn_rate')} "
             f"| {_cell(row, 'park_cleanliness')} "
@@ -313,9 +364,20 @@ def main() -> int:
                     help=f"episodes per model (default {EPISODES_PER_MODEL})")
     ap.add_argument("--json", action="store_true",
                     help="print JSON rows (incl. per-episode records)")
+    ap.add_argument("--add", nargs=3, metavar=("KEY", "GGUF_PATH", "PARAMS"),
+                    default=None,
+                    help="audition a new candidate GGUF through the ADR-006 "
+                         "gate without code edits (ephemeral row; persist via "
+                         "the matrix catalog + decision record)")
     args = ap.parse_args()
 
-    keys = [m["key"] for m in MODELS]
+    entries = list(MODELS)
+    if args.add:
+        key, gguf_arg, params = args.add
+        entries = entries + [_candidate_entry(key, gguf_arg, params)]
+        args.models = [key]  # an audition runs alone
+
+    keys = [m["key"] for m in entries]
     wanted = args.models or keys
     unknown = [k for k in wanted if k not in keys]
     if unknown:
@@ -329,12 +391,12 @@ def main() -> int:
     rows: list[dict] = []
     all_episodes: list[dict] = []
     incomplete: list[str] = []
-    for entry in MODELS:
+    for entry in entries:
         if entry["key"] not in wanted:
             continue
         print(f"== {entry['key']} ({entry['file']}, {entry['params']}) ==")
         try:
-            _swap_model(server, SMOKE_DIR / entry["file"])
+            _swap_model(server, Path(entry["gguf"]))
         except (FileNotFoundError, RuntimeError) as exc:
             print(f"   SKIP: {exc}")
             incomplete.append(entry["key"])
@@ -370,6 +432,13 @@ def main() -> int:
         print(render_table(rows))
         print(f"\n(n={args.episodes} per model, temperature pinned at "
               f"{DEFAULT_TEMPERATURE}; brackets are Wilson 95% intervals)")
+    if args.add and rows:
+        verdict = gate_verdict(rows[-1])
+        print(f"\nADR-006 gate verdict for {rows[-1]['model']}: {verdict}")
+        print("PASS: update the ROADMAP decision record, then the DEFAULT_MODEL "
+              "pin (re-decision procedure in ADR-006 section 5)."
+              if verdict == "PASS" else
+              "FAIL: not routable; the matrix row is the evidence.")
     # A skipped swap means the row is missing — say so in the exit code instead
     # of silently printing a partial matrix.
     return 1 if incomplete else 0

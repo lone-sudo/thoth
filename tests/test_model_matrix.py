@@ -1,15 +1,22 @@
 """Model matrix scoring core — offline, zero server.
 
 The episode *recording* (run_episode) needs a live llama-server; the scoring
-*core* (wilson / episode_scores / score_model / render_table) is pure data-in,
-data-out and is what these tests pin. Live episodes are exercised by running
-`python -m evals.model_matrix` (journal 2026-W39 protocol), never in CI.
+*core* (wilson / episode_scores / score_model / render_table) and the ADR-006
+gate pieces (_candidate_entry / gate_verdict, plus the main() audition flow
+with the server monkeypatched) are pure data-in, data-out and are what these
+tests pin. Live episodes are exercised by running `python -m evals.model_matrix`
+(journal 2026-W39 protocol), never in CI.
 """
 
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
+import pytest
+
+from evals import model_matrix as mm
 from evals.model_matrix import (CLEAN_PARK_REASONS, DEFAULT_TEMPERATURE,
                                 EPISODES_PER_MODEL, MODELS, episode_scores,
                                 render_table, score_model, wilson)
@@ -212,3 +219,81 @@ def test_score_rows_are_json_serializable():
     parsed = json.loads(json.dumps(row))
     assert parsed["self_finish"] == 1.0
     assert parsed["self_finish_hi"] == 1.0
+
+
+# --------------------------------------------------------- ADR-006 gate pieces
+
+def test_gate_verdict_rule():
+    """ADR-006 §4 as code: json% = tool% = 100% (n >= 1), nothing else passes."""
+    assert mm.gate_verdict({"n": 5, "json_validity": 1.0, "tool_turn_rate": 1.0}) == "PASS"
+    assert mm.gate_verdict({"n": 5, "json_validity": 1.0, "tool_turn_rate": 0.0}) == "FAIL"
+    assert mm.gate_verdict({"n": 5, "json_validity": 0.99, "tool_turn_rate": 1.0}) == "FAIL"
+    assert mm.gate_verdict({"n": 0, "json_validity": 0.0, "tool_turn_rate": 0.0}) == "incomplete"
+
+
+def test_candidate_entry_resolves_absolute_path(tmp_path):
+    gguf = tmp_path / "cand.gguf"
+    gguf.write_bytes(b"x")
+    e = mm._candidate_entry("cand", str(gguf), "1.5B")
+    assert e["key"] == "cand" and e["params"] == "1.5B"
+    assert e["file"] == "cand.gguf"
+    assert Path(e["gguf"]).is_absolute() and Path(e["gguf"]).is_file()
+
+
+def test_candidate_entry_refuses_duplicate_and_reserved_keys(capsys):
+    for key in ("smollm2-135m", "qwen2.5-3b"):
+        with pytest.raises(SystemExit) as ei:
+            mm._candidate_entry(key, "Z:/nope/x.gguf", "?")
+        assert ei.value.code == 2
+        assert "refusing" in capsys.readouterr().out
+
+
+def test_candidate_entry_refuses_missing_gguf(capsys):
+    with pytest.raises(SystemExit) as ei:
+        mm._candidate_entry("cand", "Z:/nope/missing.gguf", "?")
+    assert ei.value.code == 2
+    assert "GGUF not found" in capsys.readouterr().out
+
+
+def test_main_audition_pass_flow(monkeypatch, tmp_path, capsys):
+    """The self-serve gate end to end, server monkeypatched: --add resolves
+    the GGUF, swaps the server to it, scores, and prints the verdict."""
+    gguf = tmp_path / "cand.gguf"
+    gguf.write_bytes(b"x")
+    ep = {"model": "cand", "status": "done", "reason": "earned finish",
+          "planner_attempts": 2, "planner_parsed": 2, "verified_turns": 1,
+          "finish_probes": 0}
+    swaps: list[Path] = []
+    monkeypatch.setattr(mm, "_swap_model", lambda s, g, port=mm.PORT: swaps.append(g))
+    monkeypatch.setattr(mm, "run_episode", lambda key: dict(ep))
+    monkeypatch.setattr(sys, "argv",
+                        ["model_matrix", "--add", "cand", str(gguf), "1.5B",
+                         "--episodes", "1"])
+    rc = mm.main()
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert swaps == [gguf.resolve()]          # the server loaded the candidate
+    assert "ADR-006 gate verdict for cand: PASS" in out
+    assert "cand" in out and "1.5B" in out
+    assert "1/1" in out or "100%" in out      # the row itself is visible
+
+
+def test_main_audition_fail_flow(monkeypatch, tmp_path, capsys):
+    """A protocol-perfect non-actor FAILs the gate even at 100% JSON — the
+    exact qwen2.5-0.5b shape, now rejectable by one command."""
+    gguf = tmp_path / "liar.gguf"
+    gguf.write_bytes(b"x")
+    ep = {"model": "liar", "status": "parked",
+          "reason": "finish floor: done claimed with zero verified turns",
+          "planner_attempts": 1, "planner_parsed": 1, "verified_turns": 0,
+          "finish_probes": 0}
+    monkeypatch.setattr(mm, "_swap_model", lambda s, g, port=mm.PORT: None)
+    monkeypatch.setattr(mm, "run_episode", lambda key: dict(ep))
+    monkeypatch.setattr(sys, "argv",
+                        ["model_matrix", "--add", "liar", str(gguf), "?",
+                         "--episodes", "1"])
+    rc = mm.main()
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "ADR-006 gate verdict for liar: FAIL" in out
+    assert "not routable" in out

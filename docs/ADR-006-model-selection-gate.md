@@ -111,9 +111,12 @@ local floor only; the $0 invariant is untouched.
 
 ## Consequences
 
-- **Auditioning a candidate is one catalog row and one matrix run** — minutes
-  of local compute, $0, no gate code changes. The barrier to adding a model is
-  evidence, not engineering.
+- **Auditioning a candidate is one command** — `python -m evals.model_matrix
+  --add KEY /path/to.gguf PARAMS` resolves the GGUF, refuses duplicate and
+  decision-reserved keys, runs the protocol, and prints the verdict with the
+  next step baked in ($0, zero code edits). Persistence is deliberate: a PASS
+  still requires updating the decision record and the DEFAULT_MODEL pin, so
+  the evidence trail cannot be skipped by convenience.
 - The event log plus committed tables now answer "why is this model the
   brain?" end to end: protocol in this ADR, numbers in the journal and the
   ROADMAP record, enforcement in CI.
