@@ -4,6 +4,25 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — anti-hollow-finish floor (2026-09-29, latest)
+- **Runner policy:** a done claim with zero verified tool turns is refused —
+  the run parks diagnostically (`finish floor: done claimed with zero verified
+  turns`) and a `run.finish.refused` event records the claimed summary.
+  Verified turns count across resumes, so a run that acted in a prior episode
+  can still finish. Scripted no-work callers (the V0.2 CLI execute/resume
+  planners) opt out explicitly via `allow_finish_without_turns=True` — the
+  floor is an anti-hallucination guard, not a no-op policy. The
+  finish-confirmation probe is unaffected by construction (it only fires from
+  the repeat-breaker, which requires a prior verified turn).
+- **Re-measured matrix under the floor** (same 5-episode/0.2-temp protocol):
+  finish% before → after: smollm2-135m 100%→0%, qwen2.5-0.5b 100%→0%,
+  smollm2-360m 0%→0%, **qwen2.5-3b 100%→100% — zero cost to honest models**.
+  finish% is now a truth test: it measures who EARNS completion, not who
+  claims it. clean% 100 on all four again (20 more episodes, zero crashes).
+- ROADMAP's V3 decision record amended: the revisit trigger fired, the small
+  models did not re-rank. Suite 149 (3 new floor-contract tests), golden
+  38/38; matrix clean-park list now includes `finish floor`.
+
 ### Added — V3 planner-model decision recorded (2026-09-29, latest)
 - ROADMAP V3+ gains a decision record: **Qwen2.5-3B-Instruct (Q4_K_M, local)
   is Thoth's default planner brain**, evidenced by the stabilized model matrix

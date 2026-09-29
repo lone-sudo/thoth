@@ -253,6 +253,27 @@ def history_of(conn: sqlite3.Connection, run_id: str) -> list[dict[str, Any]]:
 PARK_LIMIT = 3          # consecutive verify failures before parking
 TOOL_TIMEOUT_NOTE = "see tools.py (15s subprocess cap)"
 
+# Finish floor (journal 2026-W39, measured with qwen2.5-0.5b): a model can
+# claim done without having acted — 100% finish rate, 0% verified tool turns.
+# A finish is only honest over evidence, so by default the runner refuses a
+# done claim until the run carries at least one verified tool turn. Scripted
+# no-work callers (the V0.2 CLI planner) pass
+# allow_finish_without_turns=True explicitly — the floor is an
+# anti-hallucination guard, not a no-op policy.
+FINISH_FLOOR_REASON = "finish floor: done claimed with zero verified turns"
+
+
+def _verified_turns(conn: sqlite3.Connection, run_id: str) -> int:
+    """Verified tool turns for THIS run across all episodes (resume-safe)."""
+    import json
+    n = 0
+    for r in conn.execute(
+            "SELECT payload_json FROM events WHERE kind = ?", (K_TURN_COMPLETED,)):
+        payload = json.loads(r["payload_json"])
+        if payload.get("run_id") == run_id and (payload.get("verify") or {}).get("ok"):
+            n += 1
+    return n
+
 
 @dataclass
 class RunResult:
@@ -270,6 +291,7 @@ def execute_run(
     max_turns: int = 25,
     tool_calls_budget: int = 20,
     deadline: str | None = None,
+    allow_finish_without_turns: bool = False,
 ) -> RunResult:
     """Drive the loop until the planner finishes or a bound trips (ADR-003 §1)."""
     run = current_run(conn)  # bounds may come from the row; params are the ceiling
@@ -303,8 +325,23 @@ def execute_run(
         except PlannerUnavailable as exc:
             return _park(conn, run_id, project, f"no provider: {exc}")
         if plan.done or plan.tool is None:
-            _finish(conn, run_id, plan.summary or "planner finished")
-            return RunResult(run_id, "done", plan.summary or "planner finished", turns_used)
+            summary = plan.summary or "planner finished"
+            # --- finish floor (journal 2026-W39) ----------------------------
+            # Refuse a done claim with zero verified turns: the model has not
+            # acted, so it cannot honestly be finished (park diagnostically
+            # instead). Counts verified turns across resumes, so continuing a
+            # run that already acted can still finish. Scripted no-work
+            # callers opt out explicitly (see FINISH_FLOOR_REASON).
+            if not allow_finish_without_turns and _verified_turns(conn, run_id) < 1:
+                emit(conn, "run.finish.refused", {
+                    "run_id": run_id,
+                    "claimed_summary": summary[:200],
+                    "verified_turns": 0,
+                })
+                conn.commit()
+                return _park(conn, run_id, project, FINISH_FLOOR_REASON)
+            _finish(conn, run_id, summary)
+            return RunResult(run_id, "done", summary, turns_used)
 
         # --- act (validate before invoke) ------------------------------------
         try:
@@ -411,6 +448,7 @@ def resume_run(
     registry: ToolRegistry,
     max_turns: int = 25,
     tool_calls_budget: int = 20,
+    allow_finish_without_turns: bool = False,
 ) -> RunResult:
     """One resume path: find the parked run, rebuild from its own history, continue.
 
@@ -441,4 +479,5 @@ def resume_run(
     planner = planner_factory(parked.get("goal") or "", history)
     return execute_run(conn, run_id, planner, registry,
                        max_turns=max_turns, tool_calls_budget=tool_calls_budget,
-                       deadline=deadline)
+                       deadline=deadline,
+                       allow_finish_without_turns=allow_finish_without_turns)

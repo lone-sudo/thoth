@@ -68,10 +68,12 @@ EPISODES_PER_MODEL = 5
 DEFAULT_TEMPERATURE = 0.2
 
 # Park reasons that are the runner working as designed (ADR-003 bounds +
-# journal 2026-W39 diagnostics). Anything else on a parked run is a crash.
+# journal 2026-W39 diagnostics + the finish floor). Anything else on a parked
+# run is a crash.
 CLEAN_PARK_REASONS = (
     "repeat-breaker", "max turns", "no provider", "tool-call budget",
     "unknown tool", "invalid tool args", "verify failed",
+    "finish floor",
 )
 
 

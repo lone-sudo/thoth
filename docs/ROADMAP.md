@@ -106,5 +106,9 @@ floor only.
 
 Revisit triggers: a smaller model reaching 100/100 on the matrix (better $0
 hardware floor); matrix failures on new goal families (generalization beyond
-README-reading); runner-side policy changes such as the anti-hollow-finish
-floor that would re-rank the small models.
+README-reading); runner-side policy changes that would re-rank the small
+models. *(Amended 2026-09-29: the anti-hollow-finish floor landed — the runner
+refuses a done claim with zero verified tool turns — and the small models did
+NOT re-rank: finish% collapsed to 0% for all three pretenders, qwen2.5-3b
+stayed 100/100/100/100. The gate was always tool%-based; the floor stopped
+finish% from flattering the liars.)*

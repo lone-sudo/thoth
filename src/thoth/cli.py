@@ -232,7 +232,8 @@ def cmd_run(args: argparse.Namespace) -> int:
             planner = runner.NoopPlanner(script=[])
             result = runner.execute_run(conn, cur["id"], planner, registry,
                                         max_turns=args.max_turns,
-                                        tool_calls_budget=args.budget)
+                                        tool_calls_budget=args.budget,
+                                        allow_finish_without_turns=True)
             print(f"run {result.run_id}: {result.status} ({result.reason})")
             return 0 if result.status == "done" else 1
 
@@ -246,7 +247,8 @@ def cmd_run(args: argparse.Namespace) -> int:
 
             result = runner.resume_run(conn, args.project, planner_factory, registry,
                                        max_turns=args.max_turns,
-                                       tool_calls_budget=args.budget)
+                                       tool_calls_budget=args.budget,
+                                       allow_finish_without_turns=True)
             print(f"run {result.run_id}: {result.status} ({result.reason})")
             return 0 if result.status == "done" else 1
 

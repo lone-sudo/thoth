@@ -40,9 +40,84 @@ def test_run_completes_via_noop_planner(conn):
 
 
 def test_empty_script_finishes_immediately(conn):
+    """Scripted no-work finishes are a designed V0.2 pattern (the CLI's
+    execute/resume planners) — they opt out of the finish floor explicitly."""
     run_id = runner.start_run(conn, project="rcc", goal="nothing to do")
-    result = runner.execute_run(conn, run_id, runner.NoopPlanner(), _registry_ok())
+    result = runner.execute_run(conn, run_id, runner.NoopPlanner(), _registry_ok(),
+                                allow_finish_without_turns=True)
     assert result.status == "done"
+
+
+# ------------------------------------------------------------------ finish floor
+
+def test_finish_floor_refuses_done_without_verified_turns(conn):
+    """The measured qwen2.5-0.5b failure (journal 2026-W39): a model claims
+    done having acted zero times. The runner refuses: diagnostic park, an
+    honest event, no run.completed with an unearned summary."""
+
+    class InstantDonePlanner:
+        def decide(self, context, history):
+            return runner.Plan(tool=None, done=True, summary="all done, trust me")
+
+    run_id = runner.start_run(conn, project="rcc", goal="claim without doing")
+    result = runner.execute_run(conn, run_id, InstantDonePlanner(), _registry_ok())
+    assert result.status == "parked"
+    assert result.reason == runner.FINISH_FLOOR_REASON
+    refused = conn.execute(
+        "SELECT payload_json FROM events WHERE kind='run.finish.refused'").fetchall()
+    assert len(refused) == 1
+    import json
+    payload = json.loads(refused[0]["payload_json"])
+    assert payload["claimed_summary"] == "all done, trust me"
+    assert payload["verified_turns"] == 0
+    # the run is parked, not done
+    row = conn.execute("SELECT status FROM runs WHERE id=?", (run_id,)).fetchone()
+    assert row["status"] == "parked"
+    assert not conn.execute(
+        "SELECT 1 FROM events WHERE kind='run.completed'").fetchone()
+
+
+def test_finish_floor_allows_finish_after_a_verified_turn(conn):
+    """Act first, then finish: the normal honest loop is untouched."""
+    run_id = runner.start_run(conn, project="rcc", goal="work then finish")
+    planner = runner.NoopPlanner(script=[("noop", {})])
+    result = runner.execute_run(conn, run_id, planner, _registry_ok())
+    assert result.status == "done"
+    assert len(runner.history_of(conn, run_id)) == 1
+
+
+def test_finish_floor_counts_verified_turns_across_resume(conn):
+    """Resume-safe: a run that already acted in a prior episode can finish on
+    resume WITHOUT the opt-out — the floor counts across episodes."""
+    run_id = runner.start_run(conn, project="rcc", goal="act, crash, resume, finish")
+    reg = _registry_ok()
+
+    class ActThenCrash:
+        def __init__(self):
+            self.calls = 0
+
+        def decide(self, context, history):
+            self.calls += 1
+            if self.calls == 1:
+                return runner.Plan(tool="noop", args={"n": 1}, summary="go")
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        runner.execute_run(conn, run_id, ActThenCrash(), reg,
+                           max_turns=50, tool_calls_budget=50)
+    conn.execute("UPDATE runs SET status='parked' WHERE id=?", (run_id,))
+    conn.commit()
+
+    result = runner.resume_run(
+        conn, "rcc", lambda goal, history: runner.NoopPlanner(), reg,
+        max_turns=50, tool_calls_budget=50)
+    assert result.status == "done"   # prior verified turn satisfies the floor
+
+    # negative control: a fresh run with zero turns still refuses
+    run_id2 = runner.start_run(conn, project="rcc", goal="fresh claim")
+    result2 = runner.execute_run(conn, run_id2, runner.NoopPlanner(), reg)
+    assert result2.status == "parked"
+    assert result2.reason == runner.FINISH_FLOOR_REASON
 
 
 # ------------------------------------------------------------------ bounds
