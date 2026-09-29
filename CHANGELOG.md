@@ -4,6 +4,18 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — ADR-006 (2026-09-29, latest)
+- **ADR-006 (proposed): the model-selection gate** — the matrix protocol as
+  the only path by which a model becomes routable (5 episodes/model, pinned
+  0.2 temperature, guard-gated episodes over the exported PLAIN_GOAL), the
+  four honestly-computed metrics (pooled-answers JSON validity, verified
+  tool turns, clean-park, earned finishes), Wilson 95% intervals over each
+  rate's own trials, the admissibility rule (json% = tool% = 100%), the
+  pin-test mechanism that makes a silent model swap fail CI, and the
+  re-decision procedure. First verdict recorded: qwen2.5-3b. Staged for
+  Team-B with four open questions (clean% in the rule, pure-question
+  finishes, re-run cadence, catalog pinning).
+
 ### Added — V3 decision wired into production routing (2026-09-29, latest)
 - `ollama.DEFAULT_MODEL` (`qwen2.5:3b-instruct`) now carries the decision's
   provenance: a comment binding it to the ROADMAP record and the matrix gate,

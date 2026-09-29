@@ -1,0 +1,167 @@
+# ADR-006: The model-selection gate — matrix protocol, admissibility rule, pin tests
+
+- **Status:** Proposed (draft — pre-merge; staged for the Team-B review)
+- **Date:** 2026-09-29
+- **Depends on:** ADR-003 (the runner loop: verify-before-checkpoint — tool-turn
+  truth comes from the code verifier, never the model), ADR-004 (degradation
+  ladder, fail-closed availability; park is always preferable to guessing),
+  the model matrix (`evals/model_matrix.py`), the V3 decision record
+  (`docs/ROADMAP.md` §V3+)
+- **Constraint inherited from the spec:** $0 automatic spending — the gate
+  selects only within the local floor; cloud alternatives stay structurally
+  disabled (the `ProviderSpec` invariant), so this ADR never trades capability
+  against money.
+
+## Context
+
+Until the matrix existed, the planner model was a guess: the V1 placeholder
+tagged `qwen2.5:3b-instruct` and nothing enforced or even recorded why. The
+live smoke sessions produced real but qualitative findings — small models emit
+valid plan JSON a turn or two but cannot sustain the protocol; a model can
+look protocol-perfect while never actually acting — and no reproducible way to
+compare candidates. Two kinds of decisions were waiting on the same missing
+instrument: which brain routes the planner, and which floor policies the
+runner needs to survive the candidates.
+
+The finding that shaped everything: **qwen2.5-0.5b scores 100% JSON validity
+and 100% finish rate while acting zero times.** A metrics set that cannot see
+that difference does not measure a planner; it rewards lying. The gate below
+is built so that specific lie is structurally visible.
+
+## Decisions
+
+### 1. The matrix is the acceptance gate
+
+`evals/model_matrix.py` is the only path by which a model becomes routable:
+
+- **One row per model, same test every time:** 5 episodes per model at a
+  pinned temperature of **0.2** (the production planner's setting — rates
+  measured at different temperatures are not comparable; the smoke demo keeps
+  its 0.4 and is not the gate). The harness reuses the smoke driver's
+  guard-gated shim and the exported hint-free `PLAIN_GOAL` verbatim, so every
+  row is literally the same protocol the `--plain` benchmark runs.
+- **Every byte crosses the guard.** The matrix adds no I/O module; episodes
+  are ordinary guarded local runs, and the CI no-bypass whitelist stays
+  exactly three files.
+- **Server swap is part of the harness:** llama-server is relaunched per GGUF
+  and polled until `/v1/models` answers, so rows are reproducible on any box
+  with the models on disk.
+
+### 2. Four metrics, honestly computed
+
+| Metric | Definition | Trials |
+|---|---|---|
+| `json_validity` | planner answers that parsed into a plan (pooled) | raw answers |
+| `tool_turn_rate` | episodes with ≥1 **verified** tool turn | episodes |
+| `park_cleanliness` | terminal state is done or a diagnostic park (fixed prefix list, incl. the finish floor); a transport crash is never clean | episodes |
+| `self_finish` | episodes the model ended itself with done=true — **earned**, enforced by the finish floor | episodes |
+
+Two subtleties are load-bearing:
+
+- **`provider.attempt` is a planning round, not an answer** — a bounded retry
+  consumes two model answers inside one round, so the answer counter reads
+  `provider.outcome` events. Counting rounds undercounted invalid answers in
+  the first stabilized run (instrument lesson, journal 2026-W39).
+- **The finish floor (landed 2026-09-29) is what makes `self_finish` honest:**
+  a done claim with zero verified tool turns is refused (`run.finish.refused`)
+  and parks the run. Before the floor, finish% measured who *claims*
+  completion; after, who *earns* it. Scripted no-work callers opt out
+  explicitly (`allow_finish_without_turns=True`) — the floor is an
+  anti-hallucination guard, not a no-op policy.
+
+### 3. Wilson 95% intervals on every rate
+
+Each rate carries a Wilson score interval over **the same trials as its point
+estimate** (pooled answers for JSON validity, episodes for the rest — brackets
+always bracket their own point). Wilson is chosen over the normal
+approximation (which collapses to [0,0]/[100,100] at 0/5 and 5/5) and over
+Laplace smoothing (which invents successes): at the edges, the
+boundary-touching bound is exactly 0 or 1 by construction and the *opposite*
+bound is the informative one — test-pinned. **Rates without bounds do not
+enter decision records.**
+
+### 4. The admissibility rule
+
+> A planner model is admissible only when **json% = tool% = 100%** over the
+> matrix protocol (Wilson bounds reported alongside).
+
+First verdict (2026-09-29, 5 episodes/model): **qwen2.5-3b 100% [72,100]
+across the board** — the only candidate that both adheres to the protocol and
+acts. The small models fail on tool% (0%); after the floor, their finish% is
+0% too. `park_cleanliness` was 100% on all four: across 40 episodes the runner
+diagnosed every failure and never crashed — the gate measures *models*, while
+the degradation ladder absorbs their failures.
+
+### 5. The selection is pinned to the record by tests
+
+`ollama.DEFAULT_MODEL` (`qwen2.5:3b-instruct`) carries a provenance comment
+binding it to the ROADMAP record and this gate, and two pin tests enforce it:
+the constant equals the recorded selection, and the `ollama-local` provider
+description names the brain and "matrix-gated". **A silent model swap fails
+CI.** Re-decision procedure, stated where the swap would happen: run the
+matrix on the candidate → update the decision record → change the tag.
+
+### 6. Scope: the gate measures the protocol, not task quality
+
+Comprehension and answer quality are out of scope for V3 — the plain goal's
+semantic summary is a smoke criterion, not a matrix one. The gate asks one
+question: *does this model sustain the plan→act→verify→finish protocol inside
+Thoth's actual prompts, verifiers, and bounds?* And it selects within the
+local floor only; the $0 invariant is untouched.
+
+## Consequences
+
+- **Auditioning a candidate is one catalog row and one matrix run** — minutes
+  of local compute, $0, no gate code changes. The barrier to adding a model is
+  evidence, not engineering.
+- The event log plus committed tables now answer "why is this model the
+  brain?" end to end: protocol in this ADR, numbers in the journal and the
+  ROADMAP record, enforcement in CI.
+- Honest costs: **n=5 gives wide intervals** ([57,100] at a perfect 100%) —
+  the gate separates doers from pretenders, not good from slightly-better;
+  raising n is a protocol parameter, not a redesign. The SmolLM2 pair's JSON
+  rates also wobble between invocations (variance is itself a finding); only
+  canonical single-invocation tables are recorded as evidence.
+- The instrument and the policy co-evolve: the matrix *found* the hollow-finish
+  failure, the finish floor *sharpened* the matrix (finish% became a truth
+  test). Decision records must be re-verified when runner policy changes —
+  this happened once already, as a ROADMAP amendment.
+
+## Alternatives rejected (for the record)
+
+- **Vendor/model-card benchmarks** (MT-bench class): they measure general chat
+  quality, not protocol adherence under Thoth's exact prompts, verifiers, and
+  bounds — and they are not $0-reproducible offline.
+- **Mean-of-episode-ratios for JSON validity:** an episode with 1 attempt
+  would weigh as much as one with 12; pooling raw answers is the honest
+  denominator.
+- **Normal approximation or Laplace smoothing for intervals:** see Decision 3 —
+  both fail exactly where small-n rates live.
+- **Bigger n before a decision needs it:** n=2 was directional, n=5 separated
+  the classes cleanly; more episodes would have been precision theater.
+- **A/B-ing models in production:** the ladder is local and free — a
+  controlled matrix is cheaper, faster, and reproducible; production runs are
+  for work, not experiments.
+
+## Revisit triggers
+
+- A second goal family lands → single-goal scope becomes the bottleneck;
+  generalization must be re-gated before the decision record is trusted beyond
+  README-reading (the record names this openly).
+- A smaller model passes the gate (e.g., a 1.5B at json% = tool% = 100%) →
+  re-record: a better $0 hardware floor changes the V3 economics.
+- Runner policy changes that alter what "done" means → re-run the matrix and
+  amend the decision record (precedent: the finish floor).
+- Two admissible candidates ever tie → raise n before arguing.
+
+## Open questions staged for the Team-B review
+
+1. Should admissibility also require **clean% = 100%** (currently implied by
+   every passing model but not spelled in the rule)?
+2. Should the finish floor ever admit pure-question goals that legitimately
+   need no tool? (Current: no exceptions beyond the explicit scripted-caller
+   opt-out.)
+3. Matrix cadence: per-candidate auditions only, or periodic re-runs to catch
+   model-pack drift (GGUF re-quantizations silently changing behavior)?
+4. Should the pin-test mechanism extend to the matrix catalog itself (the
+   `MODELS` list pinned to the decision record's table)?
