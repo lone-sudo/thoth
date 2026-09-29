@@ -31,6 +31,8 @@ from thoth.planner_model import ModelPlanner, _CLIENTS  # private seam, journale
 
 WS = Path(__file__).resolve().parents[2]  # structural-rcc-suite-v4/
 TARGET = "local:llama-server@http://127.0.0.1:11434"
+PLAIN_GOAL = ("Read the file README.md in the workspace, then state in one "
+              "sentence what the project is.")
 _MODEL_NAME = "smollm2-135m"  # replaced by whatever /v1/models reports
 _FLAGS = {"fewshot": True}    # --plain turns the demo aids off
 
@@ -147,8 +149,7 @@ def main() -> int:
         # Hint-free protocol test (journal 2026-W39): no few-shot, no suggested
         # plan. Pure action goal — the pass bar is self-driven goal->action->done;
         # answer synthesis (counting lines) needs a tool the V0 registry lacks.
-        goal = ("Read the file README.md in the workspace, then state in one "
-                "sentence what the project is.")
+        goal = PLAIN_GOAL
     else:
         # Mechanics demo (journaled): tiny models parrot rather than adapt, so
         # the goal carries an explicit suggested plan.

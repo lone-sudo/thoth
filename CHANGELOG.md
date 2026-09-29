@@ -4,6 +4,27 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — model matrix eval (2026-09-28, latest)
+- **`evals/model_matrix.py`** — one row per local model, four protocol scores:
+  JSON validity, tool-turn rate, park cleanliness, self-finish. Swaps
+  llama-server across the four sha-verified GGUFs (taskkill → relaunch → poll
+  `/v1/models`) and runs the exact `--plain` hint-free protocol test per model
+  (the smoke driver's goal is now the exported `PLAIN_GOAL`, so matrix rows are
+  comparable with the smoke benchmark). Every byte still crosses
+  `guard.check_egress` via the smoke driver's shim; no new I/O modules.
+- Scoring core (`episode_scores` / `score_model` / `render_table`) is offline
+  and unit-tested (`tests/test_model_matrix.py`, 11 tests): rates over
+  episodes, clean-park = done or a diagnostic reason (never a transport
+  crash), zero-episode and zero-attempt floors, ASCII-safe table.
+- First measured matrix (2 episodes/model, live): smollm2-135m and smollm2-360m
+  50% JSON / 0% tool turns (hollow finishes); **qwen2.5-0.5b is protocol-
+  perfect and never acts — 100% JSON, 100% finish, 0% tool turns** (the exact
+  failure mode the tool-turn column exists to expose); **qwen2.5-3b 100%
+  across the board** — reads README.md, then finishes on the evidence. All
+  parks clean on all four models: the runner diagnoses, never crashes.
+- Suite at 140 (11 new), golden 38/38; smoke `--plain` regression-checked
+  green after the `PLAIN_GOAL` extraction.
+
 ### Added — Telegram surface implemented (2026-09-28, latest)
 - **`telegram.py` — the third I/O module (ADR-005 V1.5):** guard-allowlisted
   transport (exact-host `api.telegram.org`, https-only — lookalikes and
