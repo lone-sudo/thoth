@@ -50,6 +50,13 @@ PLAN_SYSTEM = (
     "Choose a tool from the provided TOOL LIST only. If the goal is complete, "
     'set "done": true and "tool": null. Never invent tools.'
 )
+# Prompt experiments are measured, not vibes: a discover-then-act heuristic
+# ("never guess a name you have not seen ... discover first, then act") was
+# tried here on 2026-09-30 against the locate-family failure and REVERTED
+# after the matrix run - no locate improvement (tool% still 0%), and the
+# memory family wobbled for the first time on the incumbent (json 100 -> 80).
+# Full story in the journal (2026-W39) and ADR-006's record. Re-adding a
+# prompt change means re-running the matrix before it ships.
 
 FINISH_SYSTEM = (
     "You are Thoth's planner performing a FINISH CHECK. No tools are available. "

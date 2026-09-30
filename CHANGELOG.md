@@ -4,6 +4,17 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Measured — prompt-level locate repair attempted and reverted (2026-09-30, latest)
+- **A discover-then-act heuristic in `PLAN_SYSTEM` did not fix the locate
+  family and was reverted**: measured through the matrix (incumbent, n=5,
+  all three families) before shipping — locate unchanged (json 100%, tool
+  0%, identical guessing), read unchanged, and the memory family wobbled
+  for the first time on the incumbent (json 100% -> 80% [55,93]). The
+  shipped prompt is byte-identical to the pre-experiment one; the constant
+  now carries the experiment's provenance comment so the negative result is
+  not silently re-litigated. Conclusion recorded in ADR-006: the locate gap
+  is a reasoning limit of the current local floor. Suite 188, golden 38/38.
+
 ### Added — honest verifier details + `thoth run execute --model` (2026-09-30, latest)
 - **file.read now tells the truth about WHICH failure happened**: a missing
   file reports `not a file in the workspace: <path>`, an escape reports

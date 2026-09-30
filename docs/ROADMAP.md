@@ -181,4 +181,8 @@ family), no longer as a gate-passing model. Revisit trigger: any local
 candidate passing ALL families re-opens V3. The gap is a planner-behavior
 finding, not a harness one — the chain was verified reachable end to end
 (solo `ls` + `file.read` succeed from inside the workspace; the context
-delivers the goal verbatim), and all 60 parks stayed clean.)*
+delivers the goal verbatim), and all 60 parks stayed clean. A prompt-level
+repair (discover-then-act in PLAN_SYSTEM) was measured and reverted the
+same day: locate unchanged, first-ever memory wobble on the incumbent —
+the gap is a reasoning limit, not a prompt or messaging deficit (full
+story in ADR-006).)*

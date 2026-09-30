@@ -135,6 +135,18 @@ record: the pin changes basis — qwen2.5-3b remains DEFAULT_MODEL as
 alternative on every family), no longer as a gate-passing model; any local
 candidate passing ALL families re-opens V3.
 
+Prompt-level repair attempt (2026-09-30, same day): a discover-then-act
+heuristic in `PLAN_SYSTEM` ("never guess a name you have not seen in a tool
+result; discover first, then act") was measured through this same matrix
+(incumbent, n=5, all three families) before shipping. Result: locate
+unchanged (json 100%, tool 0%, identical filename-guessing), read
+unchanged, and the memory family wobbled for the first time on the
+incumbent (json 100% → 80% [55,93]). Reverted — a neutral-to-harmful policy
+does not ship — and the constant now carries the experiment's provenance so
+it is not silently re-litigated. Conclusion: the locate gap is a reasoning
+limit of the current local floor, not a prompt deficit; the next lever is a
+stronger brain, which stays out of scope by the $0 floor, not by this ADR.
+
 ### 5. The selection is pinned to the record by tests
 
 `ollama.DEFAULT_MODEL` (`qwen2.5:3b-instruct`) carries a provenance comment
