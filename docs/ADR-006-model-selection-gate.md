@@ -1,6 +1,7 @@
 # ADR-006: The model-selection gate — matrix protocol, admissibility rule, pin tests
 
-- **Status:** Proposed (draft — pre-merge; staged for the Team-B review)
+- **Status:** Proposed (draft — pre-merge; staged for the Team-B review).
+  Amended 2026-09-30: goal families — the gate generalizes (section 4).
 - **Date:** 2026-09-29
 - **Depends on:** ADR-003 (the runner loop: verify-before-checkpoint — tool-turn
   truth comes from the code verifier, never the model), ADR-004 (degradation
@@ -34,12 +35,18 @@ is built so that specific lie is structurally visible.
 
 `evals/model_matrix.py` is the only path by which a model becomes routable:
 
-- **One row per model, same test every time:** 5 episodes per model at a
-  pinned temperature of **0.2** (the production planner's setting — rates
-  measured at different temperatures are not comparable; the smoke demo keeps
-  its 0.4 and is not the gate). The harness reuses the smoke driver's
-  guard-gated shim and the exported hint-free `PLAIN_GOAL` verbatim, so every
-  row is literally the same protocol the `--plain` benchmark runs.
+- **One row per model per goal family, same test every time:** 5 episodes per
+  model per family at a pinned temperature of **0.2** (the production
+  planner's setting — rates measured at different temperatures are not
+  comparable; the smoke demo keeps its 0.4 and is not the gate). The harness
+  reuses the smoke driver's guard-gated shim and the exported hint-free
+  `PLAIN_GOAL` verbatim for the `read` family, so those rows are literally
+  the same protocol the `--plain` benchmark runs. Since the 2026-09-30
+  amendment the matrix scores **goal families** (`GOAL_FAMILIES`):
+  `read` (file.read over the workspace) and `memory` (FTS retrieval via
+  `memory.search` over notes seeded into the episode's own DB, exactly like
+  production memory) — `--family` restricts a run; a verdict needs every
+  family.
 - **Every byte crosses the guard.** The matrix adds no I/O module; episodes
   are ordinary guarded local runs, and the CI no-bypass whitelist stays
   exactly three files.
@@ -83,7 +90,9 @@ enter decision records.**
 ### 4. The admissibility rule
 
 > A planner model is admissible only when **json% = tool% = 100%** over the
-> matrix protocol (Wilson bounds reported alongside).
+> matrix protocol (Wilson bounds reported alongside) — **within every goal
+> family** (amended 2026-09-30; `gate_verdict(gate_row(rows))` is this rule
+> as code). A model that reads but cannot retrieve is not routable.
 
 First verdict (2026-09-29, 5 episodes/model): **qwen2.5-3b 100% [72,100]
 across the board** — the only candidate that both adheres to the protocol and
@@ -91,6 +100,16 @@ acts. The small models fail on tool% (0%); after the floor, their finish% is
 0% too. `park_cleanliness` was 100% on all four: across 40 episodes the runner
 diagnosed every failure and never crashed — the gate measures *models*, while
 the degradation ladder absorbs their failures.
+
+Second verdict (2026-09-30, two families, 5 episodes/model/family):
+**qwen2.5-3b passes the amended gate — 100%/100% in BOTH `read` and
+`memory`.** The generalization risk the first record named openly is now a
+measured quantity: the same protocol, composed over a second level-0 tool,
+did not demote the incumbent. The pretender pattern survives the new family
+intact (qwen2.5-0.5b: 100% JSON in both families, tool% 40/0, hollow
+floor-refused finishes in memory), and the SmolLM2 pair degrades per family
+without a single crash (park_cleanliness 100% across all 40 two-family
+episodes). Full table in the ROADMAP decision record amendment.
 
 ### 5. The selection is pinned to the record by tests
 
@@ -113,8 +132,9 @@ local floor only; the $0 invariant is untouched.
 
 - **Auditioning a candidate is one command** — `python -m evals.model_matrix
   --add KEY /path/to.gguf PARAMS` resolves the GGUF, refuses duplicate and
-  decision-reserved keys, runs the protocol, and prints the verdict with the
-  next step baked in ($0, zero code edits). Persistence is deliberate: a PASS
+  decision-reserved keys, runs the protocol **across every goal family** (one
+  server load per model), and prints the folded verdict with the next step
+  baked in ($0, zero code edits). Persistence is deliberate: a PASS
   still requires updating the decision record and the DEFAULT_MODEL pin, so
   the evidence trail cannot be skipped by convenience.
 - The event log plus committed tables now answer "why is this model the
@@ -148,9 +168,13 @@ local floor only; the $0 invariant is untouched.
 
 ## Revisit triggers
 
-- A second goal family lands → single-goal scope becomes the bottleneck;
-  generalization must be re-gated before the decision record is trusted beyond
-  README-reading (the record names this openly).
+## Revisit triggers
+
+- ~~A second goal family lands~~ → **resolved 2026-09-30**: the `memory`
+  family (retrieval via `memory.search`) landed; the incumbent was re-gated
+  and passed in both families (second verdict, section 4). The next family —
+  anything beyond read + retrieve, e.g. a synthesis goal needing multi-tool
+  chains — re-opens this trigger.
 - A smaller model passes the gate (e.g., a 1.5B at json% = tool% = 100%) →
   re-record: a better $0 hardware floor changes the V3 economics.
 - Runner policy changes that alter what "done" means → re-run the matrix and

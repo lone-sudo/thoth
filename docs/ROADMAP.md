@@ -78,8 +78,8 @@ producers, voice, cross-machine autonomy, vertical skill packs, product packagin
 
 **Decision: Qwen2.5-3B-Instruct (Q4_K_M, local) is Thoth's default planner
 brain.** Evidence: the model matrix (`evals/model_matrix.py`; protocol: 5
-episodes/model, temperature pinned 0.2, Wilson 95% intervals, hint-free
-`--plain` goal — full protocol in `docs/journal/2026-W39.md`):
+episodes/model PER GOAL FAMILY, temperature pinned 0.2, Wilson 95% intervals,
+hint-free `--plain` goal — full protocol in `docs/journal/2026-W39.md`):
 
 | model         |  n |          json% |          tool% |         clean% |        finish% |
 | smollm2-135m  |  5 |    83% [44,97] |      0% [0,43] |  100% [57,100] |  100% [57,100] |
@@ -98,7 +98,8 @@ never crashed.
 
 Selection rule going forward: a planner model is admissible only when every
 matrix episode shows a parsed plan and ≥1 verified tool turn (json% = tool% =
-100%, Wilson bounds reported alongside); any new candidate GGUF earns a row in
+100%, Wilson bounds reported alongside) — **within every goal family** since
+the 2026-09-30 amendment (below); any new candidate GGUF earns a row in
 the same protocol before it can be routed to. The matrix is the acceptance
 gate; this table is its first verdict. Cloud alternatives stay structurally
 disabled (ProviderSpec $0 invariant) — this decision selects within the local
@@ -112,3 +113,29 @@ refuses a done claim with zero verified tool turns — and the small models did
 NOT re-rank: finish% collapsed to 0% for all three pretenders, qwen2.5-3b
 stayed 100/100/100/100. The gate was always tool%-based; the floor stopped
 finish% from flattering the liars.)*
+
+*(Amended 2026-09-30: a second goal family landed — the matrix now scores each
+model over `read` (the PLAIN_GOAL file.read test) AND `memory` (retrieval via
+`memory.search` over seeded notes), and the admissibility rule requires
+json% = tool% = 100% within EVERY family — ADR-006 section 4 as amended. The
+generalization risk the V3 record named openly is now measured. Two-family
+canonical run, 5 episodes/model/family, temp 0.2, floor ON:*
+
+| model         | family |  n |          json% |          tool% |         clean% |        finish% |
+| smollm2-135m  | read   |  5 |    83% [44,97] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | memory |  5 |    22% [6,55]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | read   |  5 |    15% [4,42]  |     40% [12,77] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | memory |  5 |     8% [1,35]  |     20% [4,62] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | read   |  5 |  100% [70,100] |     40% [12,77] |  100% [57,100] |     40% [12,77] |
+| qwen2.5-0.5b  | memory |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-3b    | read   |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | memory |  5 |  100% [76,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+
+*Verdict: qwen2.5-3b passes the amended gate — 100% JSON validity and 100%
+tool turns in BOTH families — so the V3 decision stands on measured
+generalization, not the single README-reading goal it was first gated on. The
+small models re-confirm their failure modes per family (the 0.5b pretender:
+100% JSON in both families, tool% 40/0 — and its memory-family episodes are
+pure hollow finishes, floor-refused). All 40 parks clean across all four
+models. No change to the DEFAULT_MODEL pin; the evidence trail just got
+wider.)*

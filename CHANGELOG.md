@@ -4,6 +4,22 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — second goal family in the model matrix (2026-09-30, latest)
+- **The gate measures generalization instead of naming it** (the revisit
+  trigger ADR-006 and the V3 record both listed): the matrix now scores each
+  model over `GOAL_FAMILIES` — `read` (the exported hint-free PLAIN_GOAL,
+  unchanged and still the `--plain` benchmark) and `memory` (FTS retrieval
+  via `memory.search` over notes seeded into each episode's fresh DB, exactly
+  like production memory). Per-family rows in one table (`family` column),
+  `--family` to restrict a run, and the ADR-006 admissibility rule amended to
+  **json% = tool% = 100% within EVERY family** (`gate_row` folds family rows;
+  `gate_verdict` refuses partial records as `incomplete`, and a
+  `--family`-restricted audition honestly reports it). Amended verdict:
+  qwen2.5-3b passes in BOTH families (100/100 each, Wilson-reported), the
+  0.5b pretender still separates (100% JSON both families, tool% 40/0), all
+  40 two-family parks clean. DEFAULT_MODEL pin unchanged; suite 165, golden
+  38/38.
+
 ### Added — self-serve gate auditions (2026-09-29, latest)
 - **`--add KEY GGUF_PATH PARAMS` on the model matrix** (ADR-006 Open Question
   4 was about pinning the catalog; this answers the audition ergonomics): a
