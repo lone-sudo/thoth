@@ -1,7 +1,9 @@
 # ADR-006: The model-selection gate — matrix protocol, admissibility rule, pin tests
 
 - **Status:** Proposed (draft — pre-merge; staged for the Team-B review).
-  Amended 2026-09-30: goal families — the gate generalizes (section 4).
+  Amended 2026-09-30: goal families — the gate generalizes (section 4);
+  same day, a third (multi-step) family demoted the incumbent to
+  best-available (section 4, third verdict).
 - **Date:** 2026-09-29
 - **Depends on:** ADR-003 (the runner loop: verify-before-checkpoint — tool-turn
   truth comes from the code verifier, never the model), ADR-004 (degradation
@@ -43,10 +45,13 @@ is built so that specific lie is structurally visible.
   `PLAIN_GOAL` verbatim for the `read` family, so those rows are literally
   the same protocol the `--plain` benchmark runs. Since the 2026-09-30
   amendment the matrix scores **goal families** (`GOAL_FAMILIES`):
-  `read` (file.read over the workspace) and `memory` (FTS retrieval via
+  `read` (file.read over the workspace), `memory` (FTS retrieval via
   `memory.search` over notes seeded into the episode's own DB, exactly like
-  production memory) — `--family` restricts a run; a verdict needs every
-  family.
+  production memory), and `locate` (multi-step: the target file's name is
+  never in the goal and `file.read` cannot list directories, so the only
+  path is `shell.read` to discover, then `file.read` to read; each episode
+  gets a fresh temp workspace with a decoy file) — `--family` restricts a
+  run; a verdict needs every family.
 - **Every byte crosses the guard.** The matrix adds no I/O module; episodes
   are ordinary guarded local runs, and the CI no-bypass whitelist stays
   exactly three files.
@@ -105,14 +110,30 @@ diagnosed every failure and never crashed — the gate measures *models*, while
 the degradation ladder absorbs their failures.
 
 Second verdict (2026-09-30, two families, 5 episodes/model/family):
-**qwen2.5-3b passes the amended gate — 100%/100% in BOTH `read` and
-`memory`.** The generalization risk the first record named openly is now a
+**qwen2.5-3b passed the then-amended gate — 100%/100% in BOTH `read` and
+`memory`.** The generalization risk the first record named openly became a
 measured quantity: the same protocol, composed over a second level-0 tool,
-did not demote the incumbent. The pretender pattern survives the new family
+did not demote the incumbent. The pretender pattern survived the new family
 intact (qwen2.5-0.5b: 100% JSON in both families, tool% 40/0, hollow
-floor-refused finishes in memory), and the SmolLM2 pair degrades per family
+floor-refused finishes in memory), and the SmolLM2 pair degraded per family
 without a single crash (park_cleanliness 100% across all 40 two-family
 episodes). Full table in the ROADMAP decision record amendment.
+
+Third verdict (2026-09-30, three families, 5 episodes/model/family, 60
+episodes): **no local candidate passes the gate.** The `locate` family
+demoted the incumbent: qwen2.5-3b stays perfect on `read` and `memory`
+(100%/100% each) but scores 100% JSON with **0% tool turns on `locate`** —
+it guesses file names from the goal's keyword (`deploy*`, `deploy`,
+`deploy.txt`) straight into `file.read`, never planning the `shell.read`
+listing step, deterministically at the pinned temperature. The failure was
+verified to be the model's, not the harness's: the chain is reachable end
+to end (a solo `ls` lists the target first; `file.read` reads it; the
+turn-observation summary hands the discovered name back on line one; the
+goal reaches the planner verbatim). Consequence, recorded in the decision
+record: the pin changes basis — qwen2.5-3b remains DEFAULT_MODEL as
+**best-available** under the $0 local-only floor (it dominates every
+alternative on every family), no longer as a gate-passing model; any local
+candidate passing ALL families re-opens V3.
 
 ### 5. The selection is pinned to the record by tests
 
@@ -129,7 +150,12 @@ Comprehension and answer quality are out of scope for V3 — the plain goal's
 semantic summary is a smoke criterion, not a matrix one. The gate asks one
 question: *does this model sustain the plan→act→verify→finish protocol inside
 Thoth's actual prompts, verifiers, and bounds?* And it selects within the
-local floor only; the $0 invariant is untouched.
+local floor only; the $0 invariant is untouched. The `locate` family
+sharpens the question into *can it chain tools to reach an answer it cannot
+guess?* — and the measured answer for every local candidate is currently
+no, which is exactly the kind of finding the gate exists to surface (the
+larger models this points at remain out of scope by the $0 floor, not by
+this ADR).
 
 ## Consequences
 

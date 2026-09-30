@@ -11,10 +11,11 @@ questions Team-B will ask about every candidate brain:
                      via the tool-free finish-confirmation probe)
 
 Scored per GOAL FAMILY (ADR-006 amended 2026-09-30): the same protocol runs
-over each family — "read" (file.read over the workspace) and "memory" (FTS
-retrieval via memory.search) — and the ADR-006 gate passes a model only when
-json% = tool% = 100% within EVERY family. Generalization is measured, not
-assumed.
+over each family - "read" (file.read over the workspace), "memory" (FTS
+retrieval via memory.search), and "locate" (multi-step: shell.read to find a
+target file, then file.read to read it) - and the ADR-006 gate passes a
+model only when json% = tool% = 100% within EVERY family. Generalization is
+measured, not assumed.
 
 Stabilized protocol (journal 2026-W39, "publication-grade rates"): 5 episodes
 per model at a PINNED temperature (0.2 — the production planner's setting, not
@@ -103,6 +104,13 @@ DEFAULT_TEMPERATURE = 0.2
 #            fresh per-episode DB with the notes, exactly like production
 #            memory. A model can pass "read" and fail "memory"; the gate
 #            counts that as a fail.
+#   locate — multi-step generalization: the target file's name is never in
+#            the goal, so one tool call cannot reach the answer. file.read
+#            cannot list directories, so the ONLY path is shell.read (an
+#            allowlisted listing) to learn the name, then file.read to read
+#            it. run_episode seeds a per-episode temp workspace with the
+#            target plus a decoy whose name also contains a keyword. The
+#            answer content is ASCII and stated in the goal's own words.
 GOAL_FAMILIES: dict[str, dict[str, str]] = {
     "read": {
         "goal": smoke.PLAIN_GOAL,
@@ -112,6 +120,11 @@ GOAL_FAMILIES: dict[str, dict[str, str]] = {
         "goal": ("Search stored memory for the deployment port of the thoth "
                  "web app, then state the port in one sentence."),
         "describe": "memory.search",
+    },
+    "locate": {
+        "goal": ("Find the file in the workspace whose name starts with "
+                 "deploy, then state the file's first line in one sentence."),
+        "describe": "shell.read + file.read",
     },
 }
 # Table/gate order: floor-first, insertion order of GOAL_FAMILIES.
@@ -123,6 +136,18 @@ MEMORY_SEED_NOTES = (
     "The thoth web app deployment listens on port 8031.",
     "Deployment dry-run logs go to the ops channel, not to a file.",
 )
+
+# Per-episode workspace for the locate family: the target file's name is
+# discoverable only by listing the directory (file.read cannot list), and the
+# decoy punishes keyword-lazy listings. Fixed answer line: the finish summary
+# is judge-comparable across episodes without grading a freeform sentence.
+LOCATE_DIR = Path(tempfile.gettempdir()) / "thoth-matrix-locate"
+LOCATE_TARGET_NAME = "deploy-notes.txt"
+LOCATE_TARGET_LINE = "The deployment marker reads alpha-seven."
+LOCATE_SEED_FILES = {
+    LOCATE_TARGET_NAME: LOCATE_TARGET_LINE + "\nSecond line for depth.\n",
+    "release-readme.txt": "Release checklist lives elsewhere.\n",
+}
 
 # Park reasons that are the runner working as designed (ADR-003 bounds +
 # journal 2026-W39 diagnostics + the finish floor). Anything else on a parked
@@ -278,6 +303,7 @@ def run_episode(model_key: str, family: str = "read") -> dict:
     if tmp.exists():
         tmp.unlink()
     conn = db.connect(tmp)
+    prev_cwd = os.getcwd()
     try:
         ok, why = smoke._probe_llama(conn)
         if not ok:
@@ -292,14 +318,24 @@ def run_episode(model_key: str, family: str = "read") -> dict:
 
         # The family's hint-free goal. Family "read" IS the smoke driver's
         # exported PLAIN_GOAL (the --plain protocol test), so read-family
-        # rows stay comparable with the 2/2 smoke benchmark; "memory" composes
-        # on the same harness with a different level-0 tool.
+        # rows stay comparable with the 2/2 smoke benchmark; "memory" and
+        # "locate" compose on the same harness over different level-0 tools.
         goal = GOAL_FAMILIES[family]["goal"]
         if family == "memory":
             # Production memory: notes exist before the run; the answer is
             # reachable only through memory.search (FTS over these rows).
             for body in MEMORY_SEED_NOTES:
                 notes.add(conn, body, kind="fact", project="thoth")
+        elif family == "locate":
+            # Fresh per-episode temp workspace (stale leftovers would leak a
+            # free answer to `ls`); the target's name is learnable only by
+            # listing it via shell.read, then reading it via file.read. The
+            # episode RUNS inside that workspace: "the workspace" is pwd,
+            # so every tool resolves it without any hint in the goal.
+            LOCATE_DIR.mkdir(exist_ok=True)
+            for name, text in LOCATE_SEED_FILES.items():
+                (LOCATE_DIR / name).write_text(text, encoding="ascii")
+            os.chdir(LOCATE_DIR)
         sid = runner.start_run(conn, "thoth", goal, max_turns=6,
                                tool_calls_budget=6)
         registry = tools.default_registry()
@@ -341,6 +377,7 @@ def run_episode(model_key: str, family: str = "read") -> dict:
             "finish_probes": probes,
         }
     finally:
+        os.chdir(prev_cwd)
         conn.close()
 
 

@@ -4,6 +4,25 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — locate family: the gate measures multi-step generalization (2026-09-30, latest)
+- **Third goal family in the model matrix** (the "beyond read + retrieve"
+  trigger re-armed by the second family): the target file's name is never in
+  the goal and `file.read` cannot list directories, so the ONLY path is
+  `shell.read` to discover, then `file.read` to read — a genuine two-tool
+  chain. Episodes seed a fresh temp workspace (target + keyword decoy) and
+  run inside it, so `ls` and `file.read` resolve the workspace without any
+  hint. Three-family canonical run (4 models x 3 families x 5 episodes,
+  temp 0.2, floor ON, 60 episodes): **no local candidate passes the
+  amended gate.** The incumbent qwen2.5-3b stays perfect on read and memory
+  but scores 100% JSON with 0% tool turns on locate — deterministic
+  filename-guessing from the goal's keyword instead of a listing step;
+  verified a model failure, not a harness one (chain reachable end to end,
+  goal delivered verbatim, all 60 parks clean). **The V3 pin changes basis,
+  not value: DEFAULT_MODEL stays qwen2.5:3b-instruct as best-available
+  under the $0 local-only floor, no longer gate-passing** — provenance
+  comments, provider description, both V3 pin tests, and the ROADMAP record
+  all amended. Suite 183, golden 38/38.
+
 ### Added — fast drift mode + CI gate (2026-09-30, latest)
 - **`--fast` on the drift check** (sizes + first-1MiB fingerprints, no
   full-file sha256): the matrix preflight now runs it (invocation preflight

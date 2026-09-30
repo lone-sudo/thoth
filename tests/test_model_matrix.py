@@ -173,10 +173,16 @@ def test_render_table_rows_are_stable_and_aligned():
          "tool_turn_rate_hi": 1.0, "park_cleanliness": 1.0,
          "park_cleanliness_lo": 0.5, "park_cleanliness_hi": 1.0,
          "self_finish": 1.0, "self_finish_lo": 0.5, "self_finish_hi": 1.0},
+        {"model": "qwen2.5-3b", "family": "locate", "n": 5, "json_validity": 0.5,
+         "json_validity_lo": 0.2, "json_validity_hi": 0.8,
+         "tool_turn_rate": 0.0, "tool_turn_rate_lo": 0.0,
+         "tool_turn_rate_hi": 0.6, "park_cleanliness": 0.5,
+         "park_cleanliness_lo": 0.2, "park_cleanliness_hi": 0.8,
+         "self_finish": 0.0, "self_finish_lo": 0.0, "self_finish_hi": 0.6},
     ]
     out = render_table(rows)
     lines = out.splitlines()
-    assert len(lines) == 4                  # header + rule + two rows
+    assert len(lines) == 5                  # header + rule + three rows
     assert all(len(l) == len(lines[0]) for l in lines)   # fixed width
     assert "[50,100]" in lines[3]           # Wilson brackets visible
     assert "[0,60]" in lines[2]
@@ -184,6 +190,7 @@ def test_render_table_rows_are_stable_and_aligned():
     assert "| family" in lines[0]           # the family column exists
     assert "| read " in lines[2]            # row families rendered (default read)
     assert "| memory " in lines[3]          # and explicit on the row itself
+    assert "| locate " in lines[4]          # third family renders
 
 
 # --------------------------------------------------------------- protocol pins
@@ -197,19 +204,27 @@ def test_matrix_models_catalog():
 
 
 def test_goal_families_catalog():
-    """Two goal families (ADR-006 amended 2026-09-30), both hint-free and
+    """Three goal families (ADR-006 amended 2026-09-30), all hint-free and
     ASCII-safe (cp1252 consoles). Family 'read' IS the smoke driver's exported
     PLAIN_GOAL verbatim — single source of truth, so read-family rows stay
-    comparable with the --plain benchmark; 'memory' is retrieval via FTS."""
-    assert tuple(mm.GOAL_FAMILIES) == ("read", "memory")
-    assert mm.FAMILY_ORDER == ("read", "memory")
+    comparable with the --plain benchmark; 'memory' is retrieval via FTS;
+    'locate' is the multi-step chain (shell.read then file.read)."""
+    assert tuple(mm.GOAL_FAMILIES) == ("read", "memory", "locate")
+    assert mm.FAMILY_ORDER == ("read", "memory", "locate")
     import evals.smoke_local_planner as smoke
     assert mm.GOAL_FAMILIES["read"]["goal"] == smoke.PLAIN_GOAL
     assert mm.GOAL_FAMILIES["read"]["describe"] == "file.read"
     assert mm.GOAL_FAMILIES["memory"]["describe"] == "memory.search"
-    for spec in mm.GOAL_FAMILIES.values():
-        assert spec["goal"].isascii()
-        assert spec["describe"].isascii()
+    assert mm.GOAL_FAMILIES["locate"]["describe"] == "shell.read + file.read"
+    # locate seeds: the goal must never leak the target's name, and every
+    # seeded byte must be ASCII (cp1252 consoles) with the answer first.
+    assert mm.LOCATE_TARGET_NAME not in mm.GOAL_FAMILIES["locate"]["goal"]
+    for name, text in mm.LOCATE_SEED_FILES.items():
+        assert name.isascii() and text.isascii()
+    first = mm.LOCATE_SEED_FILES[mm.LOCATE_TARGET_NAME].splitlines()[0]
+    assert first == mm.LOCATE_TARGET_LINE
+    for keyword in ("deploy", "first line"):
+        assert keyword in mm.GOAL_FAMILIES["locate"]["goal"]
 
 
 def test_score_model_tags_family_and_refuses_mix():
@@ -258,8 +273,9 @@ def test_score_rows_are_json_serializable():
 # --------------------------------------------------------- ADR-006 gate pieces
 
 def _gate_rows(model: str = "m", *, read_ok: bool = True,
-               memory_ok: bool = True, n: int = 5) -> list[dict]:
-    """Two family rows in gate order; *_ok=False degrades tool% only."""
+               memory_ok: bool = True, locate_ok: bool = True,
+               n: int = 5) -> list[dict]:
+    """Family rows in gate order; *_ok=False degrades tool% only."""
     def _row(fam: str, ok: bool) -> dict:
         return {"model": model, "family": fam, "n": n,
                 "json_validity": 1.0, "json_validity_lo": 0.5,
@@ -270,15 +286,17 @@ def _gate_rows(model: str = "m", *, read_ok: bool = True,
                 "park_cleanliness_hi": 1.0,
                 "self_finish": 1.0 if ok else 0.0,
                 "self_finish_lo": 0.0, "self_finish_hi": 1.0}
-    return [_row("read", read_ok), _row("memory", memory_ok)]
+    return [_row("read", read_ok), _row("memory", memory_ok),
+            _row("locate", locate_ok)]
 
 
 def test_gate_row_folds_family_rows():
     flat = mm.gate_row(_gate_rows())
     assert flat["model"] == "m" and flat["n"] == 5
-    assert flat["families"] == ["read", "memory"]
+    assert flat["families"] == ["read", "memory", "locate"]
     assert flat["json_validity:read"] == 1.0
     assert flat["tool_turn_rate:memory"] == 1.0
+    assert flat["tool_turn_rate:locate"] == 1.0
 
 
 def test_gate_row_refuses_duplicate_family():
@@ -294,6 +312,9 @@ def test_gate_verdict_requires_every_family():
     assert mm.gate_verdict(mm.gate_row(_gate_rows())) == "PASS"
     assert mm.gate_verdict(mm.gate_row(_gate_rows(memory_ok=False))) == "FAIL"
     assert mm.gate_verdict(mm.gate_row(_gate_rows(read_ok=False))) == "FAIL"
+    # the multi-step family gates like any other: a model that single-steps
+    # fine but cannot chain tools is not routable
+    assert mm.gate_verdict(mm.gate_row(_gate_rows(locate_ok=False))) == "FAIL"
     rows = _gate_rows()                     # 99% JSON in ONE family: still fail
     rows[1]["json_validity"] = 0.99
     assert mm.gate_verdict(mm.gate_row(rows)) == "FAIL"
@@ -358,9 +379,10 @@ def test_main_audition_pass_flow(monkeypatch, tmp_path, capsys):
     rc = mm.main()
     out = capsys.readouterr().out
     assert rc == 0
-    assert swaps == [gguf.resolve()]          # ONE server load, both families
+    assert swaps == [gguf.resolve()]          # ONE server load, every family
     assert "ADR-006 gate verdict for cand: PASS" in out
     assert "family: read" in out and "family: memory" in out
+    assert "family: locate" in out
     assert "1.5B" in out
 
 

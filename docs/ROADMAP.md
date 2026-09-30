@@ -148,3 +148,37 @@ itself: the run warns that rows scored on the old bytes are no longer
 evidence, and `python -m evals.model_drift --check` is the operator's
 explicit refusal. Recovery: re-run the matrix, rebuild the manifest,
 amend the record.)*
+
+*(Amended 2026-09-30 (later): a third goal family — `locate` — landed: the
+target file's name is never in the goal, `file.read` cannot list
+directories, so the ONLY path is `shell.read` to discover, then `file.read`
+to read — a genuine two-tool chain, seeded per episode in a temp workspace
+with a decoy. Three-family canonical run, 5 episodes/model/family, temp
+0.2, floor ON, 60 episodes:*
+
+| model         | family |  n |          json% |          tool% |         clean% |        finish% |
+| smollm2-135m  | read   |  5 |    71% [36,92] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | memory |  5 |    50% [22,78] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | locate |  5 |    83% [44,97] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | read   |  5 |     0% [0,28]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | memory |  5 |     9% [2,38]  |     20% [4,62] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | locate |  5 |    30% [11,60] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | read   |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | memory |  5 |  100% [65,100] |     40% [12,77] |  100% [57,100] |     40% [12,77] |
+| qwen2.5-0.5b  | locate |  5 |  100% [65,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-3b    | read   |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | memory |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | locate |  5 |  100% [80,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+
+*Verdict: NO local candidate passes the amended gate across all three
+families. qwen2.5-3b — the incumbent — fails exactly the multi-step family
+(locate: 100% JSON, 0% tool turns; it guesses file names from the goal's
+keyword instead of planning a listing step, deterministically at the pinned
+temperature) while remaining perfect on both single-tool families. The pin
+changes basis, not value: qwen2.5-3b stays DEFAULT_MODEL as BEST-AVAILABLE
+under the $0 local-only floor (it dominates every alternative on every
+family), no longer as a gate-passing model. Revisit trigger: any local
+candidate passing ALL families re-opens V3. The gap is a planner-behavior
+finding, not a harness one — the chain was verified reachable end to end
+(solo `ls` + `file.read` succeed from inside the workspace; the context
+delivers the goal verbatim), and all 60 parks stayed clean.)*

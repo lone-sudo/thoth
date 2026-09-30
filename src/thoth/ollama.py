@@ -30,12 +30,16 @@ from urllib.error import URLError  # noqa: F401  (re-exported for tests to patch
 from .guard import Guard, KIND_PROVIDER, PUBLIC
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
-# The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29):
-# Qwen2.5-3B-Instruct — the only candidate that passed the model matrix
-# (evals/model_matrix.py: 100% JSON validity, 100% tool turns, 100% earned
-# finishes at n=5, temperature 0.2; the admissibility gate is json% = tool% =
-# 100%). Changing this constant re-opens the V3 decision: run the matrix on
-# the new candidate first, then update the decision record, then this tag.
+# The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29,
+# amended for the locate family 2026-09-30): Qwen2.5-3B-Instruct remains the
+# pinned brain as BEST-AVAILABLE under the $0 local-only floor — it still
+# passes both single-tool families (read, memory: 100%/100% each) but FAILS
+# the multi-step locate family (json 100%, tool 0%: it guesses filenames
+# instead of listing the directory). The amended gate requires every family,
+# so no local candidate is currently gate-passing; the pin stands on
+# best-available, not on admissibility. Changing this constant re-opens the
+# V3 decision: run the matrix on the new candidate first, then update the
+# decision record, then this tag.
 DEFAULT_MODEL = "qwen2.5:3b-instruct"
 _TIMEOUT_S = 60
 
