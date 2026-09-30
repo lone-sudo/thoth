@@ -4,6 +4,16 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — fast drift mode + CI gate (2026-09-30, latest)
+- **`--fast` on the drift check** (sizes + first-1MiB fingerprints, no
+  full-file sha256): the matrix preflight now runs it (invocation preflight
+  ~90s -> ~0.2s) and a new pytest gate runs it over the real catalog GGUFs,
+  so manifest drift fails CI in seconds instead of a ~90s full-hash pass
+  (skipped where the smoke-session GGUFs are absent). The honest tradeoff is
+  test-pinned: bytes past the head window are invisible to fast mode — the
+  full `--check` remains the operator's last word before bytes enter a
+  decision record. Suite 183, golden 38/38.
+
 ### Added — GGUF drift check: the scored bytes join the record (2026-09-30, latest)
 - **ADR-006 Open Question 3 (the silent half) resolved:** re-quantized or
   re-downloaded catalog GGUFs can no longer change behavior behind the

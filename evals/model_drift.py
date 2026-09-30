@@ -17,7 +17,8 @@ next to the decision record, checked before the gate runs.
   The matrix main() surfaces the warning loudly; `--check` exits nonzero.
 
 Usage:
-  python -m evals.model_drift            # check catalog GGUFs vs the manifest
+  python -m evals.model_drift            # full check: catalog vs the manifest
+  python -m evals.model_drift --fast     # sizes + head fingerprints only (seconds)
   python -m evals.model_drift --build    # (re)build the manifest from disk
   python -m evals.model_drift --check    # explicit check; exit 3 on drift
 
@@ -101,13 +102,19 @@ def build_manifest(models: list[dict[str, str]]) -> dict:
     return {"schema_version": SCHEMA_VERSION, "models": entries}
 
 
-def compare(manifest: dict, models: list[dict[str, str]]) -> list[dict]:
+def compare(manifest: dict, models: list[dict[str, str]],
+            fast: bool = False) -> list[dict]:
     """Catalog vs manifest. Returns drift records (empty when clean).
 
     Each record names the model key, the catalog file, the kind of drift
     (missing | size | sha256 | fingerprint), and the two sides (as available).
     Catalog files absent from the manifest are drift too: the manifest is the
-    evidence lock, and an unlocked catalog is not a pinned one."""
+    evidence lock, and an unlocked catalog is not a pinned one.
+
+    fast=True verifies sizes + first-1MiB fingerprints only, skipping the
+    full-file sha256 stage (~4 MiB read for the four-model catalog instead of
+    ~3 GB): cheap enough for a per-invocation preflight and a CI gate. A full
+    --check remains the last word before bytes enter a decision record."""
     listed: dict[str, dict] = {}
     for entry in manifest.get("models", []):
         name = str(entry.get("file", ""))
@@ -137,6 +144,8 @@ def compare(manifest: dict, models: list[dict[str, str]]) -> list[dict]:
             out.append({"model": key, "file": gguf_path.name, "kind": "fingerprint",
                         "detail": "first-1MiB hash differs (bytes changed)"})
             continue
+        if fast:
+            continue  # fast mode: sizes + head fingerprints are the contract
         if sha256_file(gguf_path) != entry.get("sha256"):
             out.append({"model": key, "file": gguf_path.name, "kind": "sha256",
                         "detail": "full-file hash differs (bytes changed)"})
@@ -164,11 +173,15 @@ def main() -> int:
                     help="hash the catalog GGUFs and (re)write the manifest")
     ap.add_argument("--check", action="store_true",
                     help="explicit check (the default action); exit 3 on drift")
+    ap.add_argument("--fast", action="store_true",
+                    help="sizes + first-1MiB fingerprints only, no full-file "
+                         "sha256 (seconds; what the matrix preflight and the "
+                         "CI gate run)")
     ap.add_argument("--manifest", default=str(DEFAULT_MANIFEST),
                     help=f"manifest path (default {DEFAULT_MANIFEST.name})")
     args = ap.parse_args()
-    if args.build and args.check:
-        print("--build and --check are mutually exclusive")
+    if args.build and (args.check or args.fast):
+        print("--build runs alone (--check/--fast verify an existing manifest)")
         return 2
     manifest_path = Path(args.manifest)
     try:
@@ -193,10 +206,11 @@ def main() -> int:
                   f"`python -m evals.model_drift --build` on the scored bytes")
             return 4
         manifest = load_manifest(manifest_path)
-        drift = compare(manifest, mm.MODELS)
+        drift = compare(manifest, mm.MODELS, fast=args.fast)
         if not drift:
+            mode = "fast (sizes + head fingerprints)" if args.fast else "full"
             print(f"clean: all {len(mm.MODELS)} catalog GGUFs match the "
-                  f"manifest ({manifest_path.name})")
+                  f"manifest ({manifest_path.name}, {mode} check)")
             return 0
         print(f"DRIFT: {len(drift)} of {len(mm.MODELS)} catalog GGUFs do not "
               f"match the manifest ({manifest_path.name}):")

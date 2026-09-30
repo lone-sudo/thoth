@@ -90,6 +90,39 @@ def test_compare_reports_every_drift_kind(tmp_path):
     assert kinds2["m-size"] == "sha256"
 
 
+def test_fast_compare_matches_full_on_head_drift(tmp_path):
+    """Fast mode keeps every stage except the full-sha one: same-size byte
+    changes are still caught (that is the fingerprint's whole job)."""
+    catalog = _mini_catalog(tmp_path)
+    manifest = md.build_manifest(catalog)
+    assert md.compare(manifest, catalog, fast=True) == []
+    Path(catalog[1]["gguf"]).write_bytes(b"mini-qwen3b.ggug")  # 16 B, same size
+    kinds_fast = {d["model"]: d["kind"]
+                  for d in md.compare(manifest, catalog, fast=True)}
+    kinds_full = {d["model"]: d["kind"] for d in md.compare(manifest, catalog)}
+    assert kinds_fast == {"qwen3b": "fingerprint"}
+    assert kinds_fast == kinds_full
+
+
+def test_fast_blind_spot_is_tail_only_full_check_catches_it(tmp_path):
+    """The honest tradeoff, pinned: bytes past the head window are invisible
+    to fast mode; the full sha256 remains the last word."""
+    p = tmp_path / "big.gguf"
+    head = b"A" * md.CHECK_BYTES
+    p.write_bytes(head + b"B" * md.CHECK_BYTES)
+    catalog = [{"key": "big", "file": "big.gguf", "params": "?",
+                "gguf": str(p)}]
+    manifest = {"schema_version": 1, "models": [
+        {"file": "big.gguf", "params": "?",
+         "size_bytes": p.stat().st_size, "sha256": md.sha256_file(p),
+         "head_sha256": md.fingerprint_file(p)}]}
+    assert md.compare(manifest, catalog, fast=True) == []
+    p.write_bytes(head + b"C" + b"B" * (md.CHECK_BYTES - 1))  # tail corruption
+    assert md.compare(manifest, catalog, fast=True) == []     # blind by design
+    kinds = {d["model"]: d["kind"] for d in md.compare(manifest, catalog)}
+    assert kinds == {"big": "sha256"}
+
+
 def test_compare_refuses_duplicate_manifest_entries(tmp_path):
     p = tmp_path / "dup.gguf"
     p.write_bytes(b"x")
@@ -146,6 +179,19 @@ def test_cli_check_clean_exit_zero(tmp_path, capsys, monkeypatch):
     assert "clean: all 2" in capsys.readouterr().out
 
 
+def test_cli_fast_flag_checks_fingerprint_stage_only(tmp_path, capsys,
+                                                     monkeypatch):
+    catalog = _mini_catalog(tmp_path)
+    manifest_path = tmp_path / "m.json"
+    _write_manifest(manifest_path, catalog, tmp_path)
+    monkeypatch.setattr(md.mm, "MODELS", catalog)
+    monkeypatch.setattr(sys, "argv", ["model_drift", "--fast", "--manifest",
+                                      str(manifest_path)])
+    assert md.main() == 0
+    out = capsys.readouterr().out
+    assert "clean: all 2" in out and "fast" in out
+
+
 def test_cli_detects_drift_exit_three(tmp_path, capsys, monkeypatch):
     catalog = _mini_catalog(tmp_path)
     manifest_path = tmp_path / "m.json"
@@ -197,7 +243,10 @@ def test_cli_conflicting_flags_exit_two(capsys, monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["model_drift", "--build", "--check",
                                       "--manifest", str(tmp_path / "m.json")])
     assert md.main() == 2
-    assert "mutually exclusive" in capsys.readouterr().out
+    assert "--build runs alone" in capsys.readouterr().out
+    monkeypatch.setattr(sys, "argv", ["model_drift", "--build", "--fast",
+                                      "--manifest", str(tmp_path / "m.json")])
+    assert md.main() == 2                                    # --fast too
 
 
 # -------------------------------------------------- committed-manifest pins
@@ -221,6 +270,17 @@ def test_committed_manifest_records_are_shape_complete():
         assert int(e["size_bytes"]) > 0
 
 
+def test_committed_manifest_fast_check_passes():
+    """The CI drift gate (ADR-006 Q3): sizes + first-1MiB fingerprints over
+    the real catalog GGUFs — ~4 MiB read, seconds, no server. Skipped where
+    the smoke-session GGUFs are absent; the full --check remains the
+    operator's last word before bytes enter a decision record."""
+    if not all(Path(m["gguf"]).is_file() for m in mm.MODELS):
+        pytest.skip("catalog GGUFs not on disk (no smoke-session environment)")
+    manifest = md.load_manifest(md.DEFAULT_MANIFEST)
+    assert md.compare(manifest, mm.MODELS, fast=True) == []
+
+
 # ---------------------------------------------------- matrix preflight wire
 
 def test_matrix_preflight_warns_on_drift(capsys, monkeypatch, tmp_path):
@@ -230,10 +290,12 @@ def test_matrix_preflight_warns_on_drift(capsys, monkeypatch, tmp_path):
                   "kind": "fingerprint", "detail": "bytes changed"}]
     monkeypatch.setattr(md, "load_manifest",
                         lambda p: {"schema_version": 1, "models": []})
-    monkeypatch.setattr(md, "compare", lambda man, models: drift_rec)
+    monkeypatch.setattr(md, "compare",
+                        lambda man, models, fast=False: drift_rec)
     monkeypatch.setattr(mm.drift, "load_manifest",
                         lambda p: {"schema_version": 1, "models": []})
-    monkeypatch.setattr(mm.drift, "compare", lambda man, models: drift_rec)
+    monkeypatch.setattr(mm.drift, "compare",
+                        lambda man, models, fast=False: drift_rec)
     mm._preflight_drift(tmp_path / "unused")
     out = capsys.readouterr().out
     assert "DRIFT WARNING" in out and "no longer evidence" in out
@@ -241,8 +303,9 @@ def test_matrix_preflight_warns_on_drift(capsys, monkeypatch, tmp_path):
 
 def test_matrix_preflight_silent_when_clean(capsys, monkeypatch):
     monkeypatch.setattr(md, "load_manifest", lambda p: {"models": []})
-    monkeypatch.setattr(md, "compare", lambda man, models: [])
+    monkeypatch.setattr(md, "compare", lambda man, models, fast=False: [])
     monkeypatch.setattr(mm.drift, "load_manifest", lambda p: {"models": []})
-    monkeypatch.setattr(mm.drift, "compare", lambda man, models: [])
+    monkeypatch.setattr(mm.drift, "compare",
+                        lambda man, models, fast=False: [])
     mm._preflight_drift("unused")
     assert "DRIFT" not in capsys.readouterr().out

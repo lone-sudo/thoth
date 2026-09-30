@@ -458,10 +458,13 @@ def _preflight_drift(server: Path) -> None:
     """ADR-006 Q3 (resolved 2026-09-30): warn loudly when the catalog GGUFs no
     longer match the committed manifest — a re-quantized GGUF invalidates the
     decision record's rows as evidence. Warn-and-proceed; refusing is the
-    operator's explicit call (python -m evals.model_drift --check, exit 3)."""
+    operator's explicit call (python -m evals.model_drift --check, exit 3).
+    Runs the FAST check (sizes + head fingerprints, seconds — no full-file
+    hashing on the episode path); the full sha256 remains the last word for
+    the operator's explicit --check before bytes enter a decision record."""
     try:
         manifest = drift.load_manifest(drift.DEFAULT_MANIFEST)
-        records = drift.compare(manifest, MODELS)
+        records = drift.compare(manifest, MODELS, fast=True)
     except FileNotFoundError:
         print("drift preflight: no manifest yet "
               "(python -m evals.model_drift --build hashes the scored bytes)")

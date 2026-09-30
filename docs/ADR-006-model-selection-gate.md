@@ -206,7 +206,11 @@ local floor only; the $0 invariant is untouched.
    `--check`), the matrix preflight-checks it before every invocation, and a
    mismatch prints the evidence warning ("rows scored on the old bytes are
    no longer evidence") with the recovery procedure. The check hashes bytes
-   only (no server, no episodes, seconds of runtime). Whether full periodic
+   only (no server, no episodes). Two speeds since the same-day fast-mode
+   amendment: `--fast` (sizes + first-1MiB fingerprints, ~0.2s — what the
+   matrix preflight and the CI gate run, so manifest drift fails pytest in
+   seconds) and the full check (adds the full-file sha256 pass, ~90s — the
+   last word before bytes enter a decision record). Whether full periodic
    re-runs add value on top of byte-pinning stays open for Team-B.
 4. Should the pin-test mechanism extend to the matrix catalog itself (the
    `MODELS` list pinned to the decision record's table)?
