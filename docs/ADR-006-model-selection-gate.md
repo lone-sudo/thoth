@@ -52,7 +52,10 @@ is built so that specific lie is structurally visible.
   exactly three files.
 - **Server swap is part of the harness:** llama-server is relaunched per GGUF
   and polled until `/v1/models` answers, so rows are reproducible on any box
-  with the models on disk.
+  with the models on disk. Since 2026-09-30 the catalog GGUFs are also
+  byte-pinned: a committed sha256 manifest (`evals/model_manifest.json`,
+  `evals/model_drift.py`) is preflight-checked before rows are scored —
+  re-quantized weights can no longer enter the record silently.
 
 ### 2. Four metrics, honestly computed
 
@@ -140,6 +143,13 @@ local floor only; the $0 invariant is untouched.
 - The event log plus committed tables now answer "why is this model the
   brain?" end to end: protocol in this ADR, numbers in the journal and the
   ROADMAP record, enforcement in CI.
+- **The bytes behind a verdict are part of the record** (2026-09-30): the
+  committed manifest pins exactly which GGUFs the gate scored; a matrix run
+  on drifted bytes prints the drift warning, and
+  `python -m evals.model_drift --check` is the operator's explicit refusal
+  (exit 3). Recovery is re-run the matrix → rebuild the manifest (`--build`)
+  → amend the record. The manifest is evidence, not a runtime license:
+  warn-and-proceed keeps `--add` auditions of new weights a one-command path.
 - Honest costs: **n=5 gives wide intervals** ([57,100] at a perfect 100%) —
   the gate separates doers from pretenders, not good from slightly-better;
   raising n is a protocol parameter, not a redesign. The SmolLM2 pair's JSON
@@ -188,7 +198,15 @@ local floor only; the $0 invariant is untouched.
 2. Should the finish floor ever admit pure-question goals that legitimately
    need no tool? (Current: no exceptions beyond the explicit scripted-caller
    opt-out.)
-3. Matrix cadence: per-candidate auditions only, or periodic re-runs to catch
-   model-pack drift (GGUF re-quantizations silently changing behavior)?
+3. ~~Matrix cadence: per-candidate auditions only, or periodic re-runs to
+   catch model-pack drift (GGUF re-quantizations silently changing
+   behavior)?~~ → **resolved 2026-09-30** (the silent half): drift is no
+   longer silent — the catalog GGUFs are pinned by a committed sha256
+   manifest (`evals/model_manifest.json`; `evals/model_drift.py --build` /
+   `--check`), the matrix preflight-checks it before every invocation, and a
+   mismatch prints the evidence warning ("rows scored on the old bytes are
+   no longer evidence") with the recovery procedure. The check hashes bytes
+   only (no server, no episodes, seconds of runtime). Whether full periodic
+   re-runs add value on top of byte-pinning stays open for Team-B.
 4. Should the pin-test mechanism extend to the matrix catalog itself (the
    `MODELS` list pinned to the decision record's table)?

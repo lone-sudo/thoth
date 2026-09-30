@@ -139,3 +139,12 @@ small models re-confirm their failure modes per family (the 0.5b pretender:
 pure hollow finishes, floor-refused). All 40 parks clean across all four
 models. No change to the DEFAULT_MODEL pin; the evidence trail just got
 wider.)*
+
+*(Amended 2026-09-30 (same day): the scored bytes joined the record — the
+catalog GGUFs are pinned by a committed sha256 manifest
+(`evals/model_manifest.json`, `evals/model_drift.py`), preflight-checked by
+the matrix before every invocation. A re-quantized GGUF now announces
+itself: the run warns that rows scored on the old bytes are no longer
+evidence, and `python -m evals.model_drift --check` is the operator's
+explicit refusal. Recovery: re-run the matrix, rebuild the manifest,
+amend the record.)*

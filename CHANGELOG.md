@@ -4,6 +4,24 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — GGUF drift check: the scored bytes join the record (2026-09-30, latest)
+- **ADR-006 Open Question 3 (the silent half) resolved:** re-quantized or
+  re-downloaded catalog GGUFs can no longer change behavior behind the
+  decision record's back. `evals/model_drift.py` builds and checks a
+  committed sha256 manifest (`evals/model_manifest.json`) over the matrix
+  catalog — streaming hashes (stdlib, $0, no server, no episodes, seconds of
+  runtime), size + full sha256 + first-1MiB fingerprint per GGUF, file names
+  only (no absolute paths, so the manifest survives storage moves).
+  `--check` exits 3 on drift with the recovery procedure printed; the matrix
+  preflight-checks before every invocation and warns loudly but proceeds —
+  refusing is the operator's explicit `--check` call. `model_manifest.json`
+  is evidence, not a runtime license: a manifest rebuild is deliberate
+  (`--build`), keeping `--add` auditions of new weights a one-command path.
+  Fourteen offline tests (every drift kind, CLI exit codes 0/1/2/3/4,
+  committed-manifest catalog pins, preflight wiring); live-verified both
+  directions (clean rc 0; tampered-manifest demo rc 3 + matrix DRIFT
+  WARNING). Suite 179, golden 38/38.
+
 ### Added — second goal family in the model matrix (2026-09-30, latest)
 - **The gate measures generalization instead of naming it** (the revisit
   trigger ADR-006 and the V3 record both listed): the matrix now scores each

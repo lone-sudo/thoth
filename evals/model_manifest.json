@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "file": "model.gguf",
+      "params": "135M",
+      "size_bytes": 105454432,
+      "sha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+      "head_sha256": "d0800a4e231898e653e4df9c2b413cd99390e8afae0cfca717eaf4a812889988"
+    },
+    {
+      "file": "model360.gguf",
+      "params": "360M",
+      "size_bytes": 270590880,
+      "sha256": "2fa3f013dcdd7b99f9b237717fa0b12d75bbb89984cc1274be1471a465bac9c2",
+      "head_sha256": "2c7182bd37241cae5ece6affef4ab3321a4d4723a2c2a39a8fdbb998891e9681"
+    },
+    {
+      "file": "qwen05b.gguf",
+      "params": "0.5B",
+      "size_bytes": 491400032,
+      "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+      "head_sha256": "c5f0ca616fa93c95610b78150cd3eda0534637f0e2214c01bcf7e60804f6a258"
+    },
+    {
+      "file": "qwen3b.gguf",
+      "params": "3B",
+      "size_bytes": 2104932768,
+      "sha256": "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
+      "head_sha256": "00a761a854977223da3a93cae937e32ab38dc0e997318f8ef270d2856f237310"
+    }
+  ]
+}

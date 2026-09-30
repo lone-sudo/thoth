@@ -350,6 +350,7 @@ def test_main_audition_pass_flow(monkeypatch, tmp_path, capsys):
 
     swaps: list[Path] = []
     monkeypatch.setattr(mm, "_swap_model", lambda s, g, port=mm.PORT: swaps.append(g))
+    monkeypatch.setattr(mm, "_preflight_drift", lambda server: None)  # no real-GGUF hashing here
     monkeypatch.setattr(mm, "run_episode", _ep)
     monkeypatch.setattr(sys, "argv",
                         ["model_matrix", "--add", "cand", str(gguf), "1.5B",
@@ -376,6 +377,7 @@ def test_main_audition_fail_flow(monkeypatch, tmp_path, capsys):
                 "verified_turns": 0, "finish_probes": 0}
 
     monkeypatch.setattr(mm, "_swap_model", lambda s, g, port=mm.PORT: None)
+    monkeypatch.setattr(mm, "_preflight_drift", lambda server: None)  # no real-GGUF hashing here
     monkeypatch.setattr(mm, "run_episode", _ep)
     monkeypatch.setattr(sys, "argv",
                         ["model_matrix", "--add", "liar", str(gguf), "?",
@@ -394,6 +396,7 @@ def test_main_audition_without_all_families_is_incomplete(monkeypatch, tmp_path,
     gguf = tmp_path / "half.gguf"
     gguf.write_bytes(b"x")
     monkeypatch.setattr(mm, "_swap_model", lambda s, g, port=mm.PORT: None)
+    monkeypatch.setattr(mm, "_preflight_drift", lambda server: None)  # no real-GGUF hashing here
     monkeypatch.setattr(mm, "run_episode",
                         lambda key, fam: {"model": key, "family": fam,
                                           "status": "done", "reason": "r",

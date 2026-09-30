@@ -25,6 +25,13 @@ which is exactly what a decision log needs to see.
 Every byte still crosses guard.check_egress: the matrix reuses the smoke
 driver's shim and plain harness unchanged (hint-free goal, no few-shot).
 
+Before any row is scored, a GGUF drift preflight (evals/model_drift.py,
+ADR-006 Open Question 3 resolved 2026-09-30) compares the catalog GGUFs
+against the committed manifest (evals/model_manifest.json); a mismatch warns
+loudly that old rows stopped being evidence. The run proceeds — refusing is
+the operator's call (--check) — but a matrix run on drifted bytes can never
+happen silently again.
+
 Prereqs: the smoke session's environment (journal 2026-W39) — llama-server
 (llama.cpp b11223) at %TEMP%/thoth-smoke/llama/llama-server.exe (override with
 LLAMA_SERVER) and the four sha-verified GGUFs in %TEMP%/thoth-smoke/.
@@ -58,6 +65,7 @@ from urllib.error import URLError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from evals import model_drift as drift  # noqa: E402  (GGUF preflight)
 from evals import smoke_local_planner as smoke  # noqa: E402
 from thoth import db, notes  # noqa: E402
 
@@ -446,6 +454,30 @@ def render_table(rows: list[dict]) -> str:
 # driver
 # ---------------------------------------------------------------------------
 
+def _preflight_drift(server: Path) -> None:
+    """ADR-006 Q3 (resolved 2026-09-30): warn loudly when the catalog GGUFs no
+    longer match the committed manifest — a re-quantized GGUF invalidates the
+    decision record's rows as evidence. Warn-and-proceed; refusing is the
+    operator's explicit call (python -m evals.model_drift --check, exit 3)."""
+    try:
+        manifest = drift.load_manifest(drift.DEFAULT_MANIFEST)
+        records = drift.compare(manifest, MODELS)
+    except FileNotFoundError:
+        print("drift preflight: no manifest yet "
+              "(python -m evals.model_drift --build hashes the scored bytes)")
+        return
+    except (OSError, ValueError) as exc:
+        print(f"drift preflight: unavailable ({exc})")
+        return
+    if records:
+        print("DRIFT WARNING: catalog GGUFs no longer match "
+              f"{drift.DEFAULT_MANIFEST.name}:")
+        for d in records:
+            print(f"   {d['model']:<14} {d['file']:<14} {d['kind']:<12} {d['detail']}")
+        print("   rows scored on the old bytes are no longer evidence; re-run "
+              "the matrix, rebuild the manifest (--build), amend the record.")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Thoth local-model protocol matrix")
     ap.add_argument("--models", nargs="*", default=None,
@@ -488,6 +520,7 @@ def main() -> int:
         return 2
     fams = [f for f in FAMILY_ORDER if f in fams]  # stable family order
     server = Path(os.environ.get("LLAMA_SERVER", str(DEFAULT_SERVER)))
+    _preflight_drift(server)  # ADR-006 Q3: drift never silent
 
     rows: list[dict] = []
     all_episodes: list[dict] = []
