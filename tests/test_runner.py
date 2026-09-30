@@ -191,6 +191,31 @@ def test_consecutive_verify_failures_park(conn):
     assert "verify failed" in result.reason
 
 
+def test_verify_fail_park_carries_last_action(conn):
+    """Diagnosable from the event log alone (journal 2026-W39): the park
+    message names the tool and args that kept failing."""
+    run_id = runner.start_run(conn, project="rcc", goal="what broke?")
+    reg = tools.default_registry()
+    reg.register(tools.ToolSpec(
+        name="always_fails", description="broken", permission_level=0,
+        idempotent=True, privacy_floor=0, input_schema={"path": "str"},
+        required={"path"},
+        run=lambda **k: {"ok": False, "detail": "broken"},
+        verify=lambda r: tools.VerifyReport(False, "broken"),
+    ))
+
+    class GuessingPlanner:
+        def decide(self, context, history):
+            return runner.Plan(tool="always_fails", args={"path": "deploy.txt"},
+                               summary="guess")
+
+    result = runner.execute_run(conn, run_id, GuessingPlanner(), reg)
+    assert result.status == "parked"
+    assert "verify failed 3x" in result.reason
+    assert "always_fails" in result.reason
+    assert "deploy.txt" in result.reason
+
+
 def test_invalid_tool_args_park_not_crash(conn):
     run_id = runner.start_run(conn, project="rcc", goal="bad args")
     result = runner.execute_run(conn, run_id,

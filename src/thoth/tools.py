@@ -235,7 +235,23 @@ def _run_file(path: str, workspace: str | None = None, max_chars: int = MAX_OUTP
     ws = Path(workspace) if workspace else Path.cwd()
     resolved = _safe_path(ws, path)
     if resolved is None:
-        return _result(False, "path escapes workspace or is not a file", blocked=True)
+        # Honest diagnostics (journal 2026-W39): an escape attempt and a
+        # missing target are different failures — the old single message
+        # ("path escapes workspace or is not a file") read as "the file is
+        # hidden" to a planner and likely killed its recovery (locate-family
+        # finding, 2026-09-30). _safe_path collapses both to None, so
+        # re-disambiguate here.
+        if not isinstance(path, str) or not path:
+            return _result(False, "path must be a non-empty string",
+                           blocked=True)
+        try:
+            escapes = ((ws / path).resolve().relative_to(ws.resolve()) is None)
+        except (ValueError, OSError):
+            escapes = True  # relative_to raises exactly when it escapes
+        if escapes:
+            return _result(False, "path escapes the workspace", blocked=True)
+        return _result(False, f"not a file in the workspace: {path}",
+                       blocked=True)
     try:
         text = resolved.read_text(errors="replace")
     except OSError as exc:
@@ -249,7 +265,10 @@ def _run_file(path: str, workspace: str | None = None, max_chars: int = MAX_OUTP
 
 def _verify_file(result: dict[str, Any]) -> VerifyReport:
     if result.get("blocked"):
-        return VerifyReport(False, "workspace escape blocked")
+        # Carry the tool's own honest detail ("not a file in the workspace:
+        # X" vs "path escapes the workspace") — the planner and the park
+        # message see THIS string, not the result's.
+        return VerifyReport(False, str(result.get("detail", "blocked")))
     ok = result.get("ok") is True and isinstance(result.get("content"), str)
     return VerifyReport(ok, f"chars={len(result.get('content', ''))}")
 

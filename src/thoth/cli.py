@@ -10,7 +10,8 @@ import json
 import sys
 from pathlib import Path
 
-from . import briefing, db, digest, notes, resume, runner, session, tasks, tools
+from . import (briefing, db, digest, notes, ollama, planner_model, providers,
+               resume, runner, session, tasks, tools)
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -197,6 +198,22 @@ def cmd_note(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def _model_planner(conn) -> runner.Planner:
+    """Build the real ModelPlanner (V3 decision brain) for --model runs.
+    Guard-gated probe first; unavailable = fail closed with an honest exit,
+    never a scripted fallback wearing the model's name."""
+    ok, why = ollama.probe(conn)
+    if not ok:
+        raise SystemExit(
+            "--model: local planner unavailable: " + str(why)
+            + " (start llama-server/Ollama first; no scripted fallback)")
+    availability = providers.AvailabilityCache()
+    availability.mark("ollama-local", True, why)
+    return planner_model.ModelPlanner(conn, availability=availability,
+                                      task_class="plan",
+                                      tool_registry=tools.default_registry())
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     conn = _connect(args)
     try:
@@ -229,26 +246,32 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print("no running run (create one with: thoth run start)", file=sys.stderr)
                 return 1
             registry = tools.default_registry()
-            planner = runner.NoopPlanner(script=[])
+            model_mode = bool(getattr(args, "model", False))
+            planner = _model_planner(conn) if model_mode else runner.NoopPlanner(script=[])
+            if model_mode:
+                print("  planning with the local model (V3 decision; finish floor ON)")
             result = runner.execute_run(conn, cur["id"], planner, registry,
                                         max_turns=args.max_turns,
                                         tool_calls_budget=args.budget,
-                                        allow_finish_without_turns=True)
+                                        allow_finish_without_turns=not model_mode)
             print(f"run {result.run_id}: {result.status} ({result.reason})")
             return 0 if result.status == "done" else 1
 
         if args.run_cmd == "resume":
             registry = tools.default_registry()
+            model_mode = bool(getattr(args, "model", False))
 
             def planner_factory(goal: str, history: list[dict]) -> runner.Planner:
+                if model_mode:
+                    return _model_planner(conn)
                 print(f"resuming with scripted planner (goal: {goal or 'n/a'}); "
-                      "V0.2 has no model planner — run will park again unless scripted.")
+                      "pass --model to plan with the real local model.")
                 return runner.NoopPlanner(script=[])
 
             result = runner.resume_run(conn, args.project, planner_factory, registry,
                                        max_turns=args.max_turns,
                                        tool_calls_budget=args.budget,
-                                       allow_finish_without_turns=True)
+                                       allow_finish_without_turns=not model_mode)
             print(f"run {result.run_id}: {result.status} ({result.reason})")
             return 0 if result.status == "done" else 1
 
@@ -405,16 +428,24 @@ def build_parser() -> argparse.ArgumentParser:
     rsp.add_argument("--project")
     rsp.set_defaults(func=cmd_run)
 
-    rsp = rsub.add_parser("execute", help="drive the current run (NoopPlanner in V0.2)")
+    rsp = rsub.add_parser("execute", help="drive the current run (NoopPlanner by "
+                                          "default; --model for the real brain)")
     rsp.add_argument("--project")
     rsp.add_argument("--max-turns", type=int, default=25)
     rsp.add_argument("--budget", type=int, default=20)
+    rsp.add_argument("--model", action="store_true",
+                     help="plan with the real local model (Qwen2.5-3B, "
+                          "the V3 decision) instead of the scripted "
+                          "NoopPlanner; needs a local server up")
     rsp.set_defaults(func=cmd_run)
 
     rsp = rsub.add_parser("resume", help="resume the last parked run (bounds carry over)")
     rsp.add_argument("--project")
     rsp.add_argument("--max-turns", type=int, default=25)
     rsp.add_argument("--budget", type=int, default=20)
+    rsp.add_argument("--model", action="store_true",
+                     help="resume with the real local model instead of "
+                          "the scripted NoopPlanner")
     rsp.set_defaults(func=cmd_run)
 
     bp = sub.add_parser("briefing", help="morning briefing from stored state (≤7 items)")

@@ -4,6 +4,26 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — honest verifier details + `thoth run execute --model` (2026-09-30, latest)
+- **file.read now tells the truth about WHICH failure happened**: a missing
+  file reports `not a file in the workspace: <path>`, an escape reports
+  `path escapes the workspace` — the old single message ("path escapes
+  workspace or is not a file") read as "the file is hidden" to a planner
+  and likely killed its recovery (locate-family finding). The verifier
+  carries the tool's own detail through to the planner and the park message.
+- **The verify-fail park message carries the last action** (`(last action:
+  file.read {'path': 'deploy*'})`) — episodes are diagnosable from the event
+  log alone.
+- **`thoth run execute --model` / `thoth run resume --model`**: the CLI now
+  drives the REAL local planner (the V3 decision brain) with the finish
+  floor ON — guard-gated probe first, fail-closed with an honest message
+  when no server is up (never a scripted fallback wearing the model's
+  name). Without `--model`, behavior is exactly the V0.2 scripted path.
+- Re-measured 3B locate (n=5) with the honest detail: verdict UNCHANGED
+  (json 100%, tool 0%) — the model still guesses `deploy*` every episode;
+  the park lines are now evidence instead of riddles. Suite 188, golden
+  38/38.
+
 ### Added — locate family: the gate measures multi-step generalization (2026-09-30, latest)
 - **Third goal family in the model matrix** (the "beyond read + retrieve"
   trigger re-armed by the second family): the target file's name is never in

@@ -112,11 +112,31 @@ def test_file_read_within_workspace(registry, workspace):
 
 
 def test_file_read_blocks_escape(registry, workspace):
+    """Escapes stay blocked — and the verifier now says WHICH failure, so a
+    planner can tell an attack from a typo (journal 2026-W39, locate finding)."""
     ws, secret = workspace
     spec = registry.get("file.read")
     out = spec.run(path=str(secret), workspace=str(ws))
     assert out["ok"] is False and out.get("blocked")
+    assert out["detail"] == "path escapes the workspace"
     assert tools._verify_file(out).ok is False
+    assert tools._verify_file(out).detail == "path escapes the workspace"
+
+
+def test_file_read_reports_missing_files_honestly(registry, workspace):
+    """A missing file is not an escape. The old single message ('path escapes
+    workspace or is not a file') read as 'the file is hidden' to a planner
+    and likely killed its recovery (locate-family finding, 2026-09-30)."""
+    ws, _ = workspace
+    spec = registry.get("file.read")
+    out = spec.run(path="ghost.txt", workspace=str(ws))
+    assert out["ok"] is False and out.get("blocked")
+    assert out["detail"] == "not a file in the workspace: ghost.txt"
+    v = tools._verify_file(out)
+    assert v.ok is False and v.detail == "not a file in the workspace: ghost.txt"
+    # a path that merely CONTAINS 'escape-ish' wording still reads honestly
+    out2 = spec.run(path="../outside.txt", workspace=str(ws))
+    assert "escapes the workspace" in out2["detail"]
 
 
 # ------------------------------------------------------------------ memory.search

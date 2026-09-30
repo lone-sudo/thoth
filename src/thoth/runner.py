@@ -391,8 +391,13 @@ def execute_run(
         else:
             verify_failures += 1
             if verify_failures >= PARK_LIMIT:
+                # Diagnosable from the event log alone (journal 2026-W39): the
+                # park message carries WHAT was attempted, not just that it
+                # failed — a row of identical guesses reads differently from
+                # three distinct attempts.
                 return _park(conn, run_id, project,
-                             f"verify failed {PARK_LIMIT}x: {report.detail}")
+                             f"verify failed {PARK_LIMIT}x: {report.detail} "
+                             f"(last action: {plan.tool} {clean_args})")
 
         # --- checkpoint -------------------------------------------------------
         # Output observation (journal 2026-W39): the planner self-terminates on
