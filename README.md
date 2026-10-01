@@ -31,7 +31,8 @@ thoth continue                                                           # where
 thoth note add "Prefer WAL mode" --kind preference --project thoth       # atomic note
 thoth note list --kind decision                                          # active notes
 thoth run start --project thoth --goal "Audit the event log"             # create a run
-thoth run execute --project thoth                                        # drive it (NoopPlanner in V0.2)
+thoth run execute --project thoth                                        # drive it (scripted NoopPlanner)
+thoth run execute --model --project thoth                                # real local brain (needs a server)
 thoth run resume --project thoth                                         # resume a parked run (bounds carry over)
 thoth briefing                                                           # morning report from stored state (≤7 items)
 thoth briefing --project data-eng                                        # scoped briefing; parked runs first
@@ -43,7 +44,10 @@ result with deterministic code, and appends a `run.turn.*` checkpoint to the eve
 log. Max-turns / tool-budget / deadline bounds are enforced by the runner — never the
 model — and travel inside the checkpoint, so a resumed run can't escape them. V0.2's
 planner is a scripted `NoopPlanner` (zero AI calls); a model planner implements the
-same `Planner` protocol without touching the loop.
+same `Planner` protocol without touching the loop. `--model` on `run
+execute` / `run resume` switches to the real local planner (qwen2.5-3b,
+best-available per the V3+ decision record), guard-gated and fail-closed —
+see `docs/HANDBOOK.md` for the full operator guide.
 
 `task` subcommands: `add` (with `--after` for dependencies), `list`, `next`, `update`.
 `note` subcommands: `add` (kinds: fact / decision / preference / lesson), `list`.
@@ -58,7 +62,7 @@ runner loop, not before.
 ```
 src/thoth/        paths, schema, db, events, session, resume, tasks, tools, runner, cli
 tests/            unit + integration (real SQLite via tmp_path)
-docs/             vision, roadmap, architecture (adrs/, reviews/, journal/)
+docs/             vision, roadmap, handbook, architecture (adrs/, reviews/, journal/)
 CHANGELOG.md
 ```
 

@@ -4,6 +4,17 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — operator handbook (2026-09-30, latest)
+- **`docs/HANDBOOK.md`**: the install-to-usage operator guide, verified
+  against the shipped CLI surface — install, the zero-AI memory loop, the
+  checkpointed runner (scripted vs `--model` engines), the fail-closed
+  `--model` contract, the Ollama-wire/llama-server-shim split, the full eval
+  harness (smoke `--plain`, the three-family model matrix, the GGUF drift
+  check), verification (`pytest`, `run_golden`), the Telegram surface, and
+  the honest limits. ROADMAP's V0.2 planner line is checked off: the real
+  ModelPlanner is wired into the CLI via `--model`, best-available basis and
+  locate caveat retained.
+
 ### Measured — prompt-level locate repair attempted and reverted (2026-09-30, latest)
 - **A discover-then-act heuristic in `PLAN_SYSTEM` did not fix the locate
   family and was reverted**: measured through the matrix (incumbent, n=5,

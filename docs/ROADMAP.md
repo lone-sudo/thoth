@@ -35,9 +35,13 @@ two days, run `thoth continue` — it reconstructs where you were. Zero AI calls
 - [x] Routing log schema (`task_class, provider, latency, outcome`) — collected from
       day one, *used* in V3 *(provider.route / provider.attempt / provider.outcome
       events now emitted by the ModelPlanner; latency arrives with the first client)*
-- [ ] One provider, manual override; no learned routing *(planner exists; client
-      pending — Ollama local first, guard-gated; planner model selected:
-      qwen2.5-3b, per the V3+ decision record below)*
+- [x] One provider, manual override; no learned routing *(the real ModelPlanner
+      is wired into the CLI — `thoth run execute --model` / `thoth run resume
+      --model` route the V3 decision brain through the ladder, guard-gated,
+      finish floor ON, fail-closed probe; Ollama wire, loopback-only; scripted
+      NoopPlanner stays the default without `--model`. Pin basis: best-available,
+      not gate-passing — the locate family gap stands. Handbook:
+      `docs/HANDBOOK.md`.)*
 
 ## V1 — the operating layer
 
