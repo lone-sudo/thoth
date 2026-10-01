@@ -1,7 +1,7 @@
 """Model matrix eval — one row per local model, four protocol scores (ADR-004).
 
 Scores each local GGUF on *protocol adherence*, not task quality — the four
-questions Team-B will ask about every candidate brain:
+questions to answer about every candidate brain:
   json_validity      planner answers that parsed into a plan (pooled over the
                      model's episodes: parsed answers / attempted answers)
   tool_turn_rate     episodes with >=1 verified tool turn

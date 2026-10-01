@@ -37,5 +37,5 @@ information into useful action without burying me in it — and it always shows 
 
 V0 is a **walking skeleton**: sessions, events, notes, tasks, and a trustworthy
 "where did I leave off?" — with zero AI calls. It is not the runner loop, not routing,
-not the content inbox. Those arrive in V0.2/V1 per the ROADMAP, sequenced so that
-anything the Team-B merge could overturn stays unbuild until the merge lands.
+not the content inbox. Those arrive in V0.2/V1 per the ROADMAP, sequenced on
+measured evidence (ADR-007 dissolved the old pre-merge review gate).

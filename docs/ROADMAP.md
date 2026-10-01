@@ -1,7 +1,9 @@
 # ROADMAP
 
-Sequencing rule: **build the invariant core first; anything the Team-B merge could
-overturn stays unbuilt until the merge lands.**
+Sequencing rule: **build the invariant core first; sequence on measured
+evidence** (ADR-007 dissolved the old Team-B gate — no second reviewer
+exists; caution about what stays unbuilt remains the discipline, the
+external review is not).
 
 Parity track (see `docs/reviews/azaris-benchmark.md`): ~80–85% of Azaris-class
 capability is reachable at $0. Pulled forward: **overnight briefing (V1, now)**,

@@ -1,7 +1,7 @@
 # ADR-004: The security choke point — spend guard, privacy floors, prompt-injection defense
 
-- **Status:** Proposed (draft — pre-merge; the Team-B review may sharpen it, the
-  choke-point pattern itself is treated as invariant)
+- **Status:** Accepted (ADR-007 dissolved the staging — no second reviewer exists;
+  the choke-point pattern stands as implemented, with its floors and open questions as written)
 - **Date:** 2026-09-27
 - **Depends on:** ADR-001 ($0-by-construction, declared tools only), ADR-002
   (append-only audit), ADR-003 (tool protocol: `ToolSpec.permission_level`,

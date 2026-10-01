@@ -1,7 +1,7 @@
 # ADR-003: The runner loop — context package, tool protocol, checkpoint format
 
-- **Status:** Proposed (draft — written *before* the Team-B merge lands, per the
-  roadmap sequencing rule; the merge may overturn details, the loop itself is invariant)
+- **Status:** Accepted (ADR-007 dissolved the staging — no second reviewer exists;
+  the loop shipped in V0.2, the section below keeps the questions with their owner decisions)
 - **Date:** 2026-09-27
 - **Depends on:** ADR-001 (monolith, SQLite, CLI), ADR-002 (append-only events,
   derived views)

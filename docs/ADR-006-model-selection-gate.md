@@ -1,6 +1,7 @@
 # ADR-006: The model-selection gate — matrix protocol, admissibility rule, pin tests
 
-- **Status:** Proposed (draft — pre-merge; staged for the Team-B review).
+- **Status:** Accepted (ADR-007 dissolved the staging — no second reviewer exists;
+  the gate is in force as amended).
   Amended 2026-09-30: goal families — the gate generalizes (section 4);
   same day, a third (multi-step) family demoted the incumbent to
   best-available (section 4, third verdict).

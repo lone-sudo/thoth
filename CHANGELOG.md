@@ -4,6 +4,17 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Changed — Team-B staging dissolved (2026-09-30, latest)
+- **ADR-007**: the owner recorded that no Team-B exists — the second
+  reviewer the whole pre-merge staging waited for was never going to run.
+  ADR-003/004/005/006 advance Proposed -> Accepted as written (their
+  implementations already shipped; staged-question sections kept verbatim
+  as the decision record); ADR-001's Team-B reopen clause is struck; the
+  ROADMAP sequencing rule loses the Team-B clause; the merge worksheet is
+  closed per its own rule 3 ("no input — silence is not agreement"; the
+  terminal form of silence is a reviewer who does not exist). No technical
+  decision changed.
+
 ### Added — operator handbook (2026-09-30, latest)
 - **`docs/HANDBOOK.md`**: the install-to-usage operator guide, verified
   against the shipped CLI surface — install, the zero-AI memory loop, the

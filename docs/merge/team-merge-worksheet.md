@@ -5,6 +5,14 @@ with section refs). Nothing in the "outcome" column gets written until both side
 quoted. Outcomes land as ADR status updates or superseding ADRs; disagreements are
 preserved in each ADR's alternatives-rejected section, not erased.*
 
+**CLOSED 2026-09-30 (ADR-007): no Team-B exists.** The independent review
+never ran. Per rule 3, applied globally, every Team-B cell in this
+worksheet reads "no input - reviewer does not exist" (cells left empty;
+this line is the mark). Parts 1-2 stand as the Team-A record; Part 3 is
+empty because no claims ever arrived; Part 4 is resolved below. Kept as a
+historical artifact - the discipline revives if a genuine independent
+reviewer ever appears.
+
 **Rules of engagement (from the original §56 brief):**
 
 1. Adopt Team-B's position only with evidence, not plausibility.
@@ -49,13 +57,13 @@ preserved in each ADR's alternatives-rejected section, not erased.*
 | M2 | | | | |
 | M3 | | | | |
 
-## Part 4 — Merge output checklist
+## Part 4 — Merge output checklist (closed 2026-09-30 via ADR-007)
 
-- [ ] Every adopted change → ADR status line or superseding ADR, with source quote
-- [ ] Every rejected Team-B claim → documented in alternatives-rejected, with reason
-- [ ] ADR-001/002/003 statuses updated (or superseding ADR-005+ created)
-- [ ] ROADMAP re-sequenced if ordering changed
-- [ ] Journal entry: what the merge changed, what it confirmed, what stays contested
-- [ ] CHANGELOG entry
-- [ ] Commit (merge worksheet + outcome docs together; the *comparison itself* is part
-      of the project record per §56)
+- [x] Every adopted change → ADR status line or superseding ADR, with source quote — none; no Team-B input ever arrived
+- [x] Every rejected Team-B claim → documented in alternatives-rejected, with reason — none to reject
+- [x] ADR-001/002/003 statuses updated (or superseding ADR-005+ created) — ADR-003/004/005/006 Proposed -> Accepted, ADR-001 clause struck, via ADR-007
+- [x] ROADMAP re-sequenced if ordering changed — sequencing rule's Team-B clause struck (ADR-007)
+- [x] Journal entry: what the merge changed, what it confirmed, what stays contested — 2026-09-30 journal entry records the dissolution
+- [x] CHANGELOG entry — same commit
+- [x] Commit (merge worksheet + outcome docs together; the *comparison itself* is part
+      of the project record per §56) — the dissolution is itself the outcome record

@@ -1,6 +1,7 @@
 # ADR-001: Monolith, SQLite, CLI-first, stdlib-only V0
 
-- **Status:** Accepted (draft — pre-merge; reopen if the Team-B review overturns a listed trigger)
+- **Status:** Accepted (the Team-B reopen clause was struck by ADR-007 — no second
+  reviewer exists; the revisit triggers below stand, reopened by the owner with evidence)
 - **Date:** 2026-09-27
 - **Deciders:** Owner + Team-A review (`docs/reviews/team-a-architecture-review.md`)
 

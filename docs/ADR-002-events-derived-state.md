@@ -1,6 +1,6 @@
 # ADR-002: Append-only events, derived views
 
-- **Status:** Accepted (draft — pre-merge)
+- **Status:** Accepted (ADR-007 dissolved the pre-merge qualifier — no second reviewer exists)
 - **Date:** 2026-09-27
 - **Deciders:** Owner + Team-A review (`docs/reviews/team-a-architecture-review.md`)
 

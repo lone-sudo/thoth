@@ -1,7 +1,7 @@
 # ADR-005: Telegram as Thoth's second surface — briefing delivery, approval cards, no new permissions
 
-- **Status:** Proposed (draft — pre-merge; staged for the Team-B review alongside
-  ADR-003/004 outcomes)
+- **Status:** Accepted (ADR-007 dissolved the staging — no second reviewer exists;
+  implemented as specified, live activation pending the operator's bot token)
 - **Date:** 2026-09-28
 - **Depends on:** ADR-002 (append-only event log; every surface act is an event),
   ADR-003 (runs park; bounds and privilege envelope travel in checkpoints),
