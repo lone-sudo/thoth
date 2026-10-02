@@ -91,6 +91,16 @@ thoth briefing              # morning: at most 7 items; "Nothing needs you
 thoth digest                # end-of-day: deadlines, parked runs, accomplished
 thoth briefing --project thoth
 thoth digest --json         # machine-readable (continue also has --json)
+thoth briefing --html       # the whole state as ONE local HTML file (a file,
+                            # not a server) - sessions, work, runs, memory,
+                            # the last 20 events
+```
+
+Zero-typing mode: run **`thoth` with no subcommand** and you get a numbered
+menu built from live state (close the session / work on the next task /
+resume the parked run / briefing / continue / dashboard / log). Every menu
+move dispatches the real CLI command, so the menu can never lie about what
+it does.
 ```
 
 ## 3. Runs: the checkpointed loop (ADR-003)
@@ -283,6 +293,13 @@ from chats outside the allowlist are ignored and logged. The surface
 grants no new permissions - delivery is read-only rendering of stored
 state, and approval cards only relay the operator's half of a
 `require_confirmation` handshake.
+
+The clock is the OS scheduler, not a daemon: `thoth telegram schedule`
+prints the exact lines for this machine (`schtasks` on Windows, cron
+elsewhere) and installs nothing itself. On Windows the token lives in an
+operator-owned wrapper script (`~/.thoth/thoth-reports.cmd`, outside any
+repo) that the scheduled task calls; on cron the variables sit in your
+private crontab. Reports then arrive daily with no Thoth process running.
 
 ## 7. Honest limits (read before trusting it)
 

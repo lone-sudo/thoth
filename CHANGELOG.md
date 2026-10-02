@@ -4,6 +4,21 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Added — the interface layer (2026-10-02, latest)
+- **The clock** (`thoth telegram schedule`): prints the exact platform
+  scheduler lines so briefing/digest arrive daily - installs nothing; the
+  token lives in an operator-owned wrapper outside any repo.
+- **The whole-state view** (`thoth briefing --html`): one self-contained
+  local HTML file next to the DB - no server, no port, no JavaScript;
+  every dynamic value HTML-escaped; park reasons read from `run.parked`
+  events (ADR-002), not phantom columns.
+- **Zero-typing mode**: bare `thoth` is a numbered menu built from live
+  state that dispatches REAL `cli.main` commands - the menu cannot diverge
+  from the CLI it fronts.
+- **ADR-008** records the decisions and the honest costs of the deferred
+  localhost web panel (V3+: new always-on surface, new guard crossing kind
+  over private data, second process). 10 new tests pin all of it.
+
 ### Fixed — telegram one-shot delivery reports the truth (2026-09-30, latest)
 - **`thoth telegram send-briefing` / `send-digest` no longer print
   "delivered" when the message never left the machine.** Found during

@@ -65,6 +65,11 @@ defense) — lands together with the provider registry, not after.*
       implemented — `thoth telegram send-briefing|send-digest|serve` with
       guard-allowlisted transport and card plumbing; live activation pending
       the operator's bot token, level ≥1 tools still absent by design)
+- [x] Interface layer (ADR-008): the clock via the OS scheduler (`thoth telegram
+      schedule` prints the exact lines, installs nothing), whole-state static
+      dashboard (`thoth briefing --html` - a file, not a server), zero-typing
+      menu on bare `thoth` dispatching real CLI commands; web panel deferred
+      to V3+ with its costs on record
 - [ ] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches)
 
 ## V2 — memory + content

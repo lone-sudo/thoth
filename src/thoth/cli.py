@@ -10,8 +10,8 @@ import json
 import sys
 from pathlib import Path
 
-from . import (briefing, db, digest, notes, ollama, planner_model, providers,
-               resume, runner, session, tasks, tools)
+from . import (briefing, dashboard, db, digest, notes, ollama, planner_model,
+               providers, resume, runner, schedule, session, tasks, tools)
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -305,6 +305,12 @@ def cmd_telegram(args: argparse.Namespace) -> int:
                 return 1
             print("digest delivered")
             return 0
+        if args.tg_cmd == "schedule":
+            p = schedule.plan(db_path=str(getattr(args, "db", None) or DEFAULT_DB),
+                              briefing_at=args.briefing_at,
+                              digest_at=args.digest_at)
+            print(schedule.render(p))
+            return 0
         if args.tg_cmd == "serve":
             print("serving; Ctrl-C stops (every poll is a guard-decided, "
                   "logged crossing)")
@@ -327,6 +333,11 @@ def cmd_briefing(args: argparse.Namespace) -> int:
     conn = _connect(args)
     try:
         report = briefing.build(conn, getattr(args, "project", None))
+        if getattr(args, "html", False):
+            out = dashboard.write_html(conn, getattr(args, "project", None))
+            print(f"dashboard written: {out}")
+            print("  open it in a browser - a file, no server behind it")
+            return 0
         if getattr(args, "json", False):
             import json
             print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -355,7 +366,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
-    sub = p.add_subparsers(dest="command", required=True)
+    sub = p.add_subparsers(dest="command")  # no subcommand = the menu
 
     sp = sub.add_parser("start", help="start a session")
     sp.add_argument("--project")
@@ -459,6 +470,9 @@ def build_parser() -> argparse.ArgumentParser:
     bp = sub.add_parser("briefing", help="morning briefing from stored state (≤7 items)")
     bp.add_argument("--project")
     bp.add_argument("--json", action="store_true")
+    bp.add_argument("--html", action="store_true",
+                    help="write the full-state dashboard as a local HTML "
+                         "file (a file, not a server)")
     bp.set_defaults(func=cmd_briefing)
 
     dp = sub.add_parser("digest", help="end-of-day digest: deadlines, parked, accomplished (≤7 items)")
@@ -481,6 +495,14 @@ def build_parser() -> argparse.ArgumentParser:
     tsp.add_argument("--max-cycles", type=int, default=None,
                      help="bound the loop (testing; default: until Ctrl-C)")
     tsp.set_defaults(func=cmd_telegram)
+    tsp = tsub.add_parser("schedule",
+                          help="print the exact scheduler lines for this machine "
+                               "(installs nothing)")
+    tsp.add_argument("--briefing-at", default="07:30",
+                     help="daily briefing time (HH:MM)")
+    tsp.add_argument("--digest-at", default="21:00",
+                     help="daily digest time (HH:MM)")
+    tsp.set_defaults(func=cmd_telegram)
 
     return p
 
@@ -488,6 +510,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if getattr(args, "command", None) is None:  # bare `thoth`: the menu
+        from . import menu  # lazy: menu imports this module back
+        conn = db.connect(getattr(args, "db", None) or DEFAULT_DB)
+        try:
+            menu.run_menu(args, conn)
+        finally:
+            conn.close()
+        return 0
     return args.func(args)
 
 
