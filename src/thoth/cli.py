@@ -289,12 +289,20 @@ def cmd_telegram(args: argparse.Namespace) -> int:
     try:
         if args.tg_cmd == "send-briefing":
             s = tg.build_surface(conn)
-            s.deliver_briefing(getattr(args, "project", None))
+            if not s.deliver_briefing(getattr(args, "project", None)):
+                print("delivery FAILED - the message did not leave the machine "
+                      "(surface.delivery_failed is in the event log; check "
+                      "token/chat/network)", file=sys.stderr)
+                return 1
             print("briefing delivered")
             return 0
         if args.tg_cmd == "send-digest":
             s = tg.build_surface(conn)
-            s.deliver_digest(getattr(args, "project", None))
+            if not s.deliver_digest(getattr(args, "project", None)):
+                print("delivery FAILED - the message did not leave the machine "
+                      "(surface.delivery_failed is in the event log; check "
+                      "token/chat/network)", file=sys.stderr)
+                return 1
             print("digest delivered")
             return 0
         if args.tg_cmd == "serve":

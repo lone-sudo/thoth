@@ -162,7 +162,10 @@ class Surface:
                    {"chat_id": self.chat_id, "text": text[:MAX_MESSAGE]})
 
     def deliver_briefing(self, project: str | None = None,
-                         ceiling: int = PERSONAL_CLASS) -> None:
+                         ceiling: int = PERSONAL_CLASS) -> bool:
+        """Returns True iff the message actually left the machine. Failure
+        stays an event (surface.delivery_failed), never a raise - the serve
+        loop degrades - but one-shot callers get the truth."""
         report = briefing_mod.build(self._conn, project)
         body = _render_report(apply_privacy_ceiling(report, ceiling))
         try:
@@ -171,17 +174,20 @@ class Surface:
                  {"kind": "briefing", "items": report.get("item_count", 0),
                   "ceiling": ceiling})
             self._conn.commit()
+            return True
         except SurfaceUnavailable:
-            pass  # already an event; delivery is never load-bearing
+            return False  # already an event; delivery is never load-bearing
 
-    def deliver_digest(self, project: str | None = None) -> None:
+    def deliver_digest(self, project: str | None = None) -> bool:
+        """Returns True iff the message actually left the machine."""
         body = digest_mod.render(digest_mod.build(self._conn, project))
         try:
             self.send_message(body)
             emit(self._conn, "surface.delivered", {"kind": "digest"})
             self._conn.commit()
+            return True
         except SurfaceUnavailable:
-            pass
+            return False
 
     # -- approval cards (ADR-005 §3: plumbing before need) ----------------------
 

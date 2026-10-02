@@ -262,9 +262,27 @@ thoth telegram serve            # poll loop: reports + approval cards
                                 # (--max-cycles N bounds it; default Ctrl-C)
 ```
 
-Token and chat id come from `THOTH_TG_TOKEN` / `THOTH_TG_CHAT`. Transport is
-guard-allowlisted and grants no new permissions. **Live activation awaits
-the operator's bot token.**
+Activation, start to finish:
+
+```bash
+# 1. @BotFather in Telegram: /newbot, then copy the token
+export THOTH_TG_TOKEN="123456:ABC-your-token"   # environment only, never the repo
+# 2. message your bot once, then read the chat id back:
+curl -s https://api.telegram.org/bot$THOTH_TG_TOKEN/getUpdates
+export THOTH_TG_CHAT="the numeric id from that reply"
+# 3. prove it:
+thoth telegram send-briefing
+```
+
+`send-briefing` / `send-digest` tell the truth: on any transport failure the
+message did not leave the machine, the command exits 1, and the reason is
+already in the event log (`surface.delivery_failed`, token redacted).
+`thoth telegram serve` is the long-running mode: each poll is a
+guard-decided, logged crossing, failures degrade to events, and updates
+from chats outside the allowlist are ignored and logged. The surface
+grants no new permissions - delivery is read-only rendering of stored
+state, and approval cards only relay the operator's half of a
+`require_confirmation` handshake.
 
 ## 7. Honest limits (read before trusting it)
 

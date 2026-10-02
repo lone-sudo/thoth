@@ -4,6 +4,17 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
+### Fixed — telegram one-shot delivery reports the truth (2026-09-30, latest)
+- **`thoth telegram send-briefing` / `send-digest` no longer print
+  "delivered" when the message never left the machine.** Found during
+  activation prep: the delivery path degrades failures to
+  `surface.delivery_failed` events (correct for the serve loop, unchanged),
+  but the one-shot CLI printed success unconditionally — a fake token
+  printed "briefing delivered" and exited 0. Now `deliver_briefing` /
+  `deliver_digest` return whether the message actually went out and the CLI
+  exits 1 with an honest stderr line pointing at the event log. 3 new tests
+  pin the contract; handbook gains the full activation runbook.
+
 ### Changed — Team-B staging dissolved (2026-09-30, latest)
 - **ADR-007**: the owner recorded that no Team-B exists — the second
   reviewer the whole pre-merge staging waited for was never going to run.

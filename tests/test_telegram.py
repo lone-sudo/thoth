@@ -206,3 +206,32 @@ def test_poll_delivery_failure_never_raises(conn, token):
     surfaced = [json.loads(r["payload_json"]) for r in conn.execute(
         "SELECT payload_json FROM events WHERE kind='surface.delivery_failed'")]
     assert surfaced
+
+
+# --------------------------------- one-shot truthfulness (the CLI contract)
+
+def test_deliver_briefing_returns_true_on_success(conn, token):
+    _seed_briefing_world(conn)
+    s = telegram.build_surface(conn, chat_id="42")
+    with patch.object(telegram, "_api", return_value={"ok": True}):
+        assert s.deliver_briefing() is True
+
+
+def test_deliver_digest_returns_true_on_success(conn, token):
+    s = telegram.build_surface(conn, chat_id="42")
+    with patch.object(telegram, "_api", return_value={"ok": True}):
+        assert s.deliver_digest() is True
+
+
+def test_deliver_briefing_returns_false_when_transport_fails(conn, token):
+    """The serve loop may degrade to events, but the one-shot CLI must be able
+    to say the truth: the message did not leave the machine. The failure is
+    still an event, never a raise."""
+    _seed_briefing_world(conn)
+    s = telegram.build_surface(conn, chat_id="42")
+    with patch.object(telegram, "_api",
+                      side_effect=telegram.SurfaceUnavailable("net down")):
+        assert s.deliver_briefing() is False
+    surfaced = [json.loads(r["payload_json"]) for r in conn.execute(
+        "SELECT payload_json FROM events WHERE kind='surface.delivery_failed'")]
+    assert surfaced
