@@ -4,7 +4,23 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added — the interface layer (2026-10-02, latest)
+### Added - the weekly review (2026-10-03, latest)
+- **`thoth review`**: the third rung of the report ladder (briefing =
+  morning, digest = evening, review = end of week). Seven days rolled up
+  from stored state only - zero network, zero AI, <=7 items, "a quiet
+  week" is a valid output. New idea the daily reports cannot show:
+  **counts that survive the item cap** - items are samples, `counts` in
+  `--json` is the week's arithmetic (tasks done, runs started/finished/
+  parked, notes captured, sessions held, open tasks). Sections: accom-
+  plished this week (from the append-only log, ADR-002), runs with
+  parked-resume lines, notes captured, deadlines landing next week,
+  carry-over naming the next runnable task. `--today` pins the window for
+  deterministic tests; the review also joined the bare-thoth menu.
+  ROADMAP V1 honestly updated: the $0 spend guard line is ticked (it was
+  built and wired, just never checked off) and the digest/weekly line
+  closes. 9 new tests pin it. Suite 210, golden 38/38.
+
+### Added - the interface layer (2026-10-02)
 - **The clock** (`thoth telegram schedule`): prints the exact platform
   scheduler lines so briefing/digest arrive daily - installs nothing; the
   token lives in an operator-owned wrapper outside any repo.

@@ -53,13 +53,17 @@ defense) — lands together with the provider registry, not after.*
 - [x] Provider registry + availability cache + capability floors + degradation ladder
       *(skeleton: providers declared, local-first ladder, fail-closed availability,
       `attempt()` raises for all — no clients yet; runner parks on exhausted ladder)*
-- [ ] $0 spend guard + privacy floor at the single outbound choke point (`guard.py`,
+- [x] $0 spend guard + privacy floor at the single outbound choke point (`guard.py`,
       fail-closed, every decision an event; CI test: no provider import outside guard)
+      *(wired and shipped: both real outbound paths - ollama.py, telegram.py - go
+      through the guard; structural tests pin the no-bypass invariants)*
 - [ ] Permission table `{domain → level}` + typed confirmation for destructive actions
 - [x] Morning briefing (`thoth briefing`): generated from stored state only, ≤7
       items, "nothing needs you" is a valid output, parked runs top-of-list with
       resume commands (parity track item 1; Azaris-benchmark)
-- [ ] Tasks get deadlines; end-of-day digest + weekly review
+- [x] Tasks get deadlines; end-of-day digest + weekly review *(digest shipped with
+      deadlines; weekly review landed as `thoth review` - same stored-state-only
+      discipline, item cap, plus counts that survive the item cap)*
 - [ ] Telegram surface (V1.5): Bot API briefing delivery + approval cards wired to
       `guard.require_confirmation`; grants no new permissions (ADR-005;
       implemented — `thoth telegram send-briefing|send-digest|serve` with

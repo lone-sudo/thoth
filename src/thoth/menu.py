@@ -52,6 +52,7 @@ def build_options(conn) -> list[tuple[str, list[str]]]:
                      ["run", "resume"]))
 
     opts.append(("morning briefing", ["briefing"]))
+    opts.append(("how did this week go? (review)", ["review"]))
     opts.append(("where did I leave off? (continue)", ["continue"]))
     opts.append(("state of everything (browser dashboard)",
                  ["briefing", "--html"]))

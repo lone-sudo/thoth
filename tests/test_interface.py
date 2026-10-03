@@ -103,6 +103,7 @@ def test_menu_options_are_real_commands(conn, state):
     assert any(t == ["stop"] for t in tails)  # open session -> close it
     assert any(t[:2] == ["task", "update"] for t in tails)
     assert ["briefing"] in tails and ["continue"] in tails
+    assert ["review"] in tails
     assert any("first" in lbl for lbl in labels)
 
 

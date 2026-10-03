@@ -89,8 +89,11 @@ Reports:
 thoth briefing              # morning: at most 7 items; "Nothing needs you
                             # today." is a valid output; parked runs first
 thoth digest                # end-of-day: deadlines, parked runs, accomplished
+thoth review                # weekly: 7 days rolled up - totals that survive
+                            # the item cap (counts in --json), deadlines
+                            # landing next week, carry-over
 thoth briefing --project thoth
-thoth digest --json         # machine-readable (continue also has --json)
+thoth digest --json         # machine-readable (continue and review also have --json)
 thoth briefing --html       # the whole state as ONE local HTML file (a file,
                             # not a server) - sessions, work, runs, memory,
                             # the last 20 events

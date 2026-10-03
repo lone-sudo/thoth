@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 
 from . import (briefing, dashboard, db, digest, notes, ollama, planner_model,
-               providers, resume, runner, schedule, session, tasks, tools)
+               providers, resume, review, runner, schedule, session, tasks,
+               tools)
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -363,6 +364,20 @@ def cmd_digest(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    conn = _connect(args)
+    try:
+        report = review.build(conn, getattr(args, "project", None),
+                              today=getattr(args, "today", None))
+        if getattr(args, "json", False):
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+        else:
+            print(review.render(report))
+        return 0
+    finally:
+        conn.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="thoth", description="Thoth — personal AI operating layer")
     p.add_argument("--db", help=f"database path (default {DEFAULT_DB})")
@@ -480,6 +495,13 @@ def build_parser() -> argparse.ArgumentParser:
     dp.add_argument("--today", help="override today as YYYY-MM-DD (testing)")
     dp.add_argument("--json", action="store_true")
     dp.set_defaults(func=cmd_digest)
+
+    vp = sub.add_parser("review", help="weekly review: seven days rolled up "
+                                       "from stored state (<=7 items)")
+    vp.add_argument("--project")
+    vp.add_argument("--today", help="override the week's last day as YYYY-MM-DD (testing)")
+    vp.add_argument("--json", action="store_true")
+    vp.set_defaults(func=cmd_review)
 
     tp = sub.add_parser("telegram", help="Telegram surface (ADR-005): send/serve"
                                           " — token+chat via THOTH_TG_TOKEN/THOTH_TG_CHAT")
