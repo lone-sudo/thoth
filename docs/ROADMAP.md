@@ -57,7 +57,12 @@ defense) — lands together with the provider registry, not after.*
       fail-closed, every decision an event; CI test: no provider import outside guard)
       *(wired and shipped: both real outbound paths - ollama.py, telegram.py - go
       through the guard; structural tests pin the no-bypass invariants)*
-- [ ] Permission table `{domain → level}` + typed confirmation for destructive actions
+- [x] Permission table `{domain -> level}` + typed confirmation for destructive
+      actions *(shipped: `permissions.py` holds the operator table (meta-backed,
+      observe-only by default), the guard computes every tool crossing from it,
+      and the runner now actually crosses the guard - a mutating action inside
+      the ceiling parks until the operator types its per-action token
+      (`thoth run confirm`), outside it denies; every verdict an event)*
 - [x] Morning briefing (`thoth briefing`): generated from stored state only, ≤7
       items, "nothing needs you" is a valid output, parked runs top-of-list with
       resume commands (parity track item 1; Azaris-benchmark)

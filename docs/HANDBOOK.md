@@ -186,6 +186,32 @@ the `read` and `memory` goal families, 0% tool turns on the multi-step
 Changing the pin re-opens the V3 decision: run the matrix on the candidate
 first, update the record, then the tag.
 
+### The permission table: what a run may touch (ADR-004)
+
+Every tool turn crosses the guard. The operator sets one ceiling per
+ domain - observe-only by default, so a future mutating tool ships inert:
+
+```bash
+thoth permission show             # the table: shell/file/memory/git -> 0..4
+thoth permission set git 2        # raise one domain (event logged)
+```
+
+Level 0 tools (the current registry: `shell.read`, `file.read`,
+`memory.search`) just run. A level >= 1 tool inside the ceiling does NOT
+run on the model's word alone: the run parks and prints a per-action
+token, and you confirm by typing the FULL token - not y, not a menu
+choice:
+
+```bash
+thoth run confirm confirm:16hexdigits   # binds that exact action to that run
+thoth run resume                        # the confirmed action now executes
+```
+
+The token is minted from (run id, tool, args): it unlocks one action for
+one run, replays unlock nothing else, and every attempt - grant or
+refusal - lands in the event log. Outside the ceiling the guard denies
+outright. Sensitive-class data is cleared to no tool today.
+
 ## 4. The eval harness: prove the brain before you trust it
 
 Three tools in escalating order. Prerequisite for all of them: a local server

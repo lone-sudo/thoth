@@ -29,6 +29,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .events import emit
+from . import permissions
 
 # ---------------------------------------------------------------------------
 # vocabulary
@@ -36,6 +37,7 @@ from .events import emit
 
 ALLOW = "allow"
 DENY = "deny"
+REQUIRE_CONFIRMATION = "require_confirmation"
 
 KIND_TOOL = "tool"
 KIND_NETWORK = "network"      # any outbound network call
@@ -60,9 +62,10 @@ DEFAULT_DATA_CLASS = PRIVATE
 class Decision:
     """The result of one guarded crossing. Always loggable, always explainable."""
 
-    verdict: str                 # ALLOW | DENY
+    verdict: str                 # ALLOW | DENY | REQUIRE_CONFIRMATION
     rule: str                    # machine-readable rule id
     reason: str                  # human-readable explanation
+    token: str | None = None     # typed-confirmation token (require_confirmation)
 
     @property
     def allowed(self) -> bool:
@@ -96,28 +99,36 @@ class Guard:
             **detail,
         })
         self._conn.commit()
-        return Decision(verdict, rule, reason)
+        return Decision(verdict, rule, reason, token=detail.get("token"))
 
     # -- tool crossings -------------------------------------------------------
 
     def check_tool(self, tool_name: str, *, level: int, privacy_floor: int,
-                   data_class: int = DEFAULT_DATA_CLASS) -> Decision:
+                   data_class: int = DEFAULT_DATA_CLASS,
+                   run_id: str | None = None,
+                   args: dict[str, Any] | None = None) -> Decision:
         """Gate one tool invocation. Called by the runner BEFORE spec.run().
 
-        privacy_floor semantics (ADR-004 §3): the highest data class the tool is
-        cleared to touch. Local read tools are cleared to PRIVATE; SENSITIVE is
-        denied to every tool until one is explicitly raised (none today).
+        Order of gates (ADR-004):
+        1. privacy ceiling: the data class must sit within the tool's declared
+           clearance - always first; a read of sensitive data denies at any
+           level. SENSITIVE is denied to every tool until one is explicitly
+           raised (none today).
+        2. Observe tools (level 0) allow within clearance - the entire current
+           registry travels this path.
+        3. Mutating tools (level >= 1) must sit within the operator's
+           {domain -> level} ceiling (permissions.py; no row = 0 = inert by
+           default) AND carry a typed confirmation: the guard mints a token
+           for exactly this (run_id, tool, args); the operator types the full
+           token (`thoth run confirm <token>`), which lands as a
+           `guard.confirmed` event and unlocks the identical action for this
+           run only. No run-level privilege envelopes exist yet (ADR-004
+           section 5), so the effective ceiling is the operator's table.
+
+        Fail closed on any internal error.
         """
         try:
-            # 1. level gate: mutating tools have no path in the V1 skeleton —
-            #    the confirmation flow lands with the approval surface (V1.5).
-            if level > 0:
-                return self._decide(
-                    KIND_TOOL, DENY, "level-gate",
-                    f"level {level} tool denied: confirmation flow not built",
-                    tool=tool_name, level=level, data_class=data_class)
-
-            # 2. clearance gate: data class must be within the tool's ceiling
+            # 1. clearance gate: data class must be within the tool's ceiling
             if data_class > privacy_floor:
                 return self._decide(
                     KIND_TOOL, DENY, "privacy-ceiling",
@@ -125,11 +136,38 @@ class Guard:
                     tool=tool_name, level=level, privacy_floor=privacy_floor,
                     data_class=data_class)
 
+            # 2. observe tools: the read-only path
+            if level <= 0:
+                return self._decide(
+                    KIND_TOOL, ALLOW, "within-clearance",
+                    "read-only tool within declared privacy clearance",
+                    tool=tool_name, level=level, privacy_floor=privacy_floor,
+                    data_class=data_class)
+
+            # 3. mutating tools: operator ceiling, then typed confirmation
+            domain = permissions.domain_of(tool_name)
+            op_ceiling = permissions.ceiling(self._conn, domain)
+            if level > op_ceiling:
+                return self._decide(
+                    KIND_TOOL, DENY, "domain-ceiling",
+                    f"level {level} above operator ceiling {op_ceiling} "
+                    f"for domain '{domain}'",
+                    tool=tool_name, level=level, domain=domain,
+                    ceiling=op_ceiling, run_id=run_id, data_class=data_class)
+
+            token = permissions.confirmation_token(tool_name, args, run_id)
+            if permissions.is_confirmed(self._conn, token, run_id):
+                return self._decide(
+                    KIND_TOOL, ALLOW, "operator-confirmed",
+                    "mutating action within ceiling; operator typed its token",
+                    tool=tool_name, level=level, domain=domain,
+                    token=token, run_id=run_id, data_class=data_class)
             return self._decide(
-                KIND_TOOL, ALLOW, "within-clearance",
-                "read-only tool within declared privacy clearance",
-                tool=tool_name, level=level, privacy_floor=privacy_floor,
-                data_class=data_class)
+                KIND_TOOL, REQUIRE_CONFIRMATION, "typed-confirmation-required",
+                f"mutating tool within ceiling: operator must type the token "
+                f"({token}) to unlock it for this run",
+                tool=tool_name, level=level, domain=domain,
+                token=token, run_id=run_id, data_class=data_class)
 
         except Exception as exc:  # fail closed, loudly, as an event
             return self._decide(

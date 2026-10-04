@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from . import guard
 from .events import emit, now_iso
 
 MAX_OUTPUT_CHARS = 8_000
@@ -38,7 +39,8 @@ class ToolSpec:
     description: str
     permission_level: int          # 0 observe .. 4 destructive
     idempotent: bool
-    privacy_floor: int             # 0 public .. 3 sensitive (V0.2: informational)
+    privacy_floor: int             # highest data class the tool may touch
+                                   # (guard-enforced at the crossing; ADR-004)
     input_schema: dict[str, str]   # param name -> type tag: "str" | "int" | "path"
     required: set[str] = field(default_factory=set)
     run: Callable[..., dict[str, Any]] = None  # type: ignore[assignment]
@@ -334,7 +336,7 @@ def default_registry() -> ToolRegistry:
     reg.register(ToolSpec(
         name="shell.read",
         description="Run an allowlisted read-only shell command (git/ls/cat/grep class).",
-        permission_level=0, idempotent=True, privacy_floor=0,
+        permission_level=0, idempotent=True, privacy_floor=guard.PRIVATE,
         input_schema={"command": "str", "workdir": "str", "max_chars": "int"},
         required={"command"}, run=_run_shell, verify=_verify_shell,
         summarize=_summarize_shell,
@@ -342,7 +344,7 @@ def default_registry() -> ToolRegistry:
     reg.register(ToolSpec(
         name="file.read",
         description="Read a text file inside the workspace.",
-        permission_level=0, idempotent=True, privacy_floor=0,
+        permission_level=0, idempotent=True, privacy_floor=guard.PRIVATE,
         input_schema={"path": "path", "workspace": "str", "max_chars": "int"},
         required={"path"}, run=_run_file, verify=_verify_file,
         summarize=_summarize_file,
@@ -350,7 +352,7 @@ def default_registry() -> ToolRegistry:
     reg.register(ToolSpec(
         name="memory.search",
         description="Full-text search over stored notes.",
-        permission_level=0, idempotent=True, privacy_floor=0,
+        permission_level=0, idempotent=True, privacy_floor=guard.PRIVATE,
         input_schema={"query": "str", "project": "str", "limit": "int"},
         required={"query"}, run=_run_memory, verify=_verify_memory,
         summarize=_summarize_memory,

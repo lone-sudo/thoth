@@ -20,7 +20,7 @@ def _registry_ok():
     # vary args (repeat-breaker and digest-distinctness scenarios)
     reg.register(tools.ToolSpec(
         name="noop", description="always succeeds", permission_level=0,
-        idempotent=True, privacy_floor=0, input_schema={"n": "int"},
+        idempotent=True, privacy_floor=2, input_schema={"n": "int"},
         run=lambda **k: {"ok": True, "detail": "noop"},
         verify=lambda r: tools.VerifyReport(True, "noop"),
     ))
@@ -177,7 +177,7 @@ def test_consecutive_verify_failures_park(conn):
     reg = tools.default_registry()
     reg.register(tools.ToolSpec(
         name="always_fails", description="broken", permission_level=0,
-        idempotent=True, privacy_floor=0, input_schema={},
+        idempotent=True, privacy_floor=2, input_schema={},
         run=lambda **k: {"ok": False, "detail": "broken"},
         verify=lambda r: tools.VerifyReport(False, "broken"),
     ))
@@ -198,7 +198,7 @@ def test_verify_fail_park_carries_last_action(conn):
     reg = tools.default_registry()
     reg.register(tools.ToolSpec(
         name="always_fails", description="broken", permission_level=0,
-        idempotent=True, privacy_floor=0, input_schema={"path": "str"},
+        idempotent=True, privacy_floor=2, input_schema={"path": "str"},
         required={"path"},
         run=lambda **k: {"ok": False, "detail": "broken"},
         verify=lambda r: tools.VerifyReport(False, "broken"),
@@ -367,7 +367,7 @@ def test_repeat_breaker_allows_non_idempotent_and_varying_args(conn):
     reg = _registry_ok()
     reg.register(tools.ToolSpec(
         name="tick", description="not idempotent", permission_level=0,
-        idempotent=False, privacy_floor=0, input_schema={},
+        idempotent=False, privacy_floor=2, input_schema={},
         run=lambda **k: {"ok": True, "detail": "tick"},
         verify=lambda r: tools.VerifyReport(True, "tick")))
     result = runner.execute_run(conn, run_id,

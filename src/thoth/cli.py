@@ -10,9 +10,9 @@ import json
 import sys
 from pathlib import Path
 
-from . import (briefing, dashboard, db, digest, notes, ollama, planner_model,
-               providers, resume, review, runner, schedule, session, tasks,
-               tools)
+from . import (briefing, dashboard, db, digest, notes, ollama, permissions,
+               planner_model, providers, resume, review, runner, schedule,
+               session, tasks, tools)
 from .events import emit
 
 DEFAULT_DB = Path.home() / ".thoth" / "thoth.db"
@@ -199,6 +199,25 @@ def cmd_note(args: argparse.Namespace) -> int:
         conn.close()
 
 
+def cmd_permission(args: argparse.Namespace) -> int:
+    conn = _connect(args)
+    try:
+        if args.perm_cmd == "set":
+            permissions.set_ceiling(conn, args.domain, args.level)
+            print(f"permission {args.domain} -> {args.level} "
+                  f"({permissions.LEVEL_NAMES[args.level]})")
+            print("  level >= 1 invocations now require a typed confirmation")
+            return 0
+        print("domain     ceiling  meaning")
+        for d, lv in permissions.table(conn).items():
+            print(f"{d:<9} {lv:>8}  {permissions.LEVEL_NAMES[lv]}")
+        print("mutating actions within a ceiling still require the operator "
+              "to type a per-action token (thoth run confirm)")
+        return 0
+    finally:
+        conn.close()
+
+
 def _model_planner(conn) -> runner.Planner:
     """Build the real ModelPlanner (V3 decision brain) for --model runs.
     Guard-gated probe first; unavailable = fail closed with an honest exit,
@@ -275,6 +294,22 @@ def cmd_run(args: argparse.Namespace) -> int:
                                        allow_finish_without_turns=not model_mode)
             print(f"run {result.run_id}: {result.status} ({result.reason})")
             return 0 if result.status == "done" else 1
+
+        if args.run_cmd == "confirm":
+            token = args.token
+            pending = permissions.pending_for(conn, token)
+            if pending is None:
+                print(f"no pending confirmation for {token}", file=sys.stderr)
+                return 1
+            print(f"run {pending.get('run_id')} proposes: {pending.get('tool')} "
+                  f"(level {pending.get('level')}, domain '{pending.get('domain')}')")
+            typed = input("type the token to confirm: ").strip()
+            if not permissions.confirm(conn, token, typed):
+                print("confirmation refused - nothing unlocked (event logged)",
+                      file=sys.stderr)
+                return 1
+            print("confirmed - resume the run: thoth run resume")
+            return 0
 
         print("unknown run subcommand", file=sys.stderr)
         return 2
@@ -448,6 +483,16 @@ def build_parser() -> argparse.ArgumentParser:
     tsp.add_argument("status", choices=["todo", "doing", "done"])
     tsp.set_defaults(func=cmd_task)
 
+    pp = sub.add_parser("permission", help="operator permission table "
+                                            "{domain -> level} (ADR-004)")
+    psub = pp.add_subparsers(dest="perm_cmd", required=True)
+    psp = psub.add_parser("show", help="print the table (default: all observe)")
+    psp.set_defaults(func=cmd_permission)
+    psp = psub.add_parser("set", help="raise or lower a domain's ceiling")
+    psp.add_argument("domain", choices=sorted(permissions.DOMAINS))
+    psp.add_argument("level", type=int)
+    psp.set_defaults(func=cmd_permission)
+
     rp = sub.add_parser("run", help="runner loop (ADR-003): create/status/execute/resume runs")
     rsub = rp.add_subparsers(dest="run_cmd", required=True)
 
@@ -471,6 +516,11 @@ def build_parser() -> argparse.ArgumentParser:
                      help="plan with the real local model (Qwen2.5-3B, "
                           "the V3 decision) instead of the scripted "
                           "NoopPlanner; needs a local server up")
+    rsp.set_defaults(func=cmd_run)
+
+    rsp = rsub.add_parser("confirm", help="type the token a parked run is "
+                                          "waiting for (mutating-action gate)")
+    rsp.add_argument("token")
     rsp.set_defaults(func=cmd_run)
 
     rsp = rsub.add_parser("resume", help="resume the last parked run (bounds carry over)")

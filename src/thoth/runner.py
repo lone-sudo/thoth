@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any, Protocol
 
 from . import tasks as tasks_mod
+from .guard import Guard, REQUIRE_CONFIRMATION
 from .events import emit, now_iso
 from .tools import ToolRegistry, ToolSpec, VerifyReport, default_summarize
 
@@ -297,6 +298,7 @@ def execute_run(
     run = current_run(conn)  # bounds may come from the row; params are the ceiling
     project = run["project"] if run else None
     goal = (run["goal"] if run else "") or ""
+    _guard = Guard(conn, actor="runner")  # ADR-004: every tool turn crosses it
     prior = history_of(conn, run_id)
     turns_used = len(prior)
     tool_calls_used = turns_used
@@ -353,6 +355,22 @@ def execute_run(
             emit(conn, "run.turn.failed", {"run_id": run_id, "error": str(exc)})
             conn.commit()
             return _park(conn, run_id, project, f"invalid tool args: {exc}")
+
+        # --- guard crossing (ADR-004 section 1): every tool invocation is
+        # gated, every verdict an event. A mutating action inside the
+        # operator's {domain -> level} ceiling parks until the operator types
+        # its confirmation token; outside the ceiling it denies outright.
+        decision = _guard.check_tool(
+            plan.tool, level=spec.permission_level,
+            privacy_floor=spec.privacy_floor,
+            run_id=run_id, args=clean_args)
+        if decision.verdict == REQUIRE_CONFIRMATION:
+            return _park(conn, run_id, project,
+                         f"awaiting typed confirmation {decision.token} "
+                         f"({plan.tool}) - thoth run confirm {decision.token}")
+        if not decision.allowed:
+            return _park(conn, run_id, project,
+                         f"guard denied ({decision.rule}): {decision.reason}")
 
         # --- repeat-breaker (journal 2026-W39): a model can loop forever on a
         # successful-but-pointless action (observed live: identical file.read

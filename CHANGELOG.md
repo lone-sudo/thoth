@@ -4,7 +4,28 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - the weekly review (2026-10-03, latest)
+### Added - the permission table and typed confirmation (2026-10-04, latest)
+- **`thoth permission show|set`**: the operator's `{domain -> level}` table
+  (ADR-004 section 5), stored in meta, observe-only by default - a future
+  mutating tool ships inert until you deliberately raise its domain. Every
+  change is a `permission.changed` event.
+- **Typed confirmation end to end.** A mutating tool inside the ceiling no
+  longer runs on the model's word: the runner parks with a per-action token
+  minted from (run id, tool, args); the operator confirms by typing the
+  FULL token (`thoth run confirm confirm:...` - not y, not a menu choice);
+  a `guard.confirmed` event unlocks exactly that action for that run.
+  Outside the ceiling: deny. Every verdict lands as a `guard.decision`
+  event.
+- **The runner actually crosses the guard now.** Found while wiring:
+  `guard.check_tool` existed with tests and a docstring saying "called by
+  the runner" - but no caller. The tool crossing is real as of today.
+  Wiring exposed a latent inconsistency: the read tools' specs declared
+  `privacy_floor=0` (public) while the guard contract clears local read
+  tools to PRIVATE; the specs now declare what the contract always said.
+- ROADMAP V1 permission line closed. 10 new tests pin the table, the
+  handshake, the runner integration, and the CLI. Suite 221, golden 38/38.
+
+### Added - the weekly review (2026-10-03)
 - **`thoth review`**: the third rung of the report ladder (briefing =
   morning, digest = evening, review = end of week). Seven days rolled up
   from stored state only - zero network, zero AI, <=7 items, "a quiet

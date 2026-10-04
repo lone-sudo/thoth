@@ -44,10 +44,35 @@ def test_read_only_tool_within_clearance_allowed(guard_, conn):
     assert events[0]["verdict"] == "allow" and events[0]["tool"] == "memory.search"
 
 
-def test_level_tool_denied_confirmation_not_built(guard_, conn):
+def test_level_tool_denied_by_default_table(guard_, conn):
+    """No row in the permission table = ceiling 0 = inert by default (ADR-004
+    section 5): a mutating tool ships unable to run until the operator acts."""
     d = guard_.check_tool("git.commit", level=2, privacy_floor=2)
-    assert not d.allowed and d.rule == "level-gate"
+    assert not d.allowed and d.rule == "domain-ceiling"
     assert _guard_events(conn)[0]["verdict"] == "deny"
+
+
+def test_mutating_within_ceiling_requires_typed_confirmation(guard_, conn):
+    """The full handshake: raise the ceiling -> require_confirmation with a
+    token -> operator types it -> the identical action unlocks for this run."""
+    from thoth import permissions
+    permissions.set_ceiling(conn, "git", 2)
+    d = guard_.check_tool("git.commit", level=2, privacy_floor=2,
+                          run_id="r1", args={"msg": "x"})
+    assert d.verdict == guard.REQUIRE_CONFIRMATION and d.token
+    assert not d.allowed
+    # the pending decision event carries the token and the run binding
+    pending = permissions.pending_for(conn, d.token)
+    assert pending["run_id"] == "r1" and pending["tool"] == "git.commit"
+    # typing the token unlocks exactly this (run, tool, args)
+    assert permissions.confirm(conn, d.token, d.token)
+    d2 = guard_.check_tool("git.commit", level=2, privacy_floor=2,
+                           run_id="r1", args={"msg": "x"})
+    assert d2.allowed and d2.rule == "operator-confirmed"
+    # a different run does NOT inherit the grant (different token)
+    d3 = guard_.check_tool("git.commit", level=2, privacy_floor=2,
+                           run_id="r2", args={"msg": "x"})
+    assert d3.verdict == guard.REQUIRE_CONFIRMATION
 
 
 def test_data_above_tool_clearance_denied(guard_, conn):
