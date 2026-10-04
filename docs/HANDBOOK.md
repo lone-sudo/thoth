@@ -260,7 +260,7 @@ the new bytes, rebuild the manifest, amend the decision record.
 ## 5. Verify the install
 
 ```bash
-python -m pytest                # unit + integration suite (188 tests)
+python -m pytest                # unit + integration suite (210 tests)
 python -m evals.run_golden      # 38/38 stored-state questions, DB only
 ```
 
