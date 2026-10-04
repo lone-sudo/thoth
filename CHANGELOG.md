@@ -4,7 +4,26 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - the permission table and typed confirmation (2026-10-04, latest)
+### Added - the git branch protocol, the first mutating tools (2026-10-04, latest)
+- **Three mutating git tools behind the permission gate** (`gittools.py`,
+  registered into the default registry): `git.branch_create` (level 1),
+  `git.checkout` (1), `git.commit` (2). The registry is six tools now.
+- **The protocol is code, not a prompt.** The AI works only on `thoth/*`
+  branches: branch names and checkout targets must match `thoth/*`, and
+  `git.commit` refuses while on any other branch. The rule holds at every
+  permission level - raising the git ceiling licenses mutations inside the
+  protocol, never around it. Verifiers pin repo evidence (branch exists,
+  HEAD moved), never the model's word.
+- **`git.commit` stages nothing.** It commits the index as it finds it:
+  the run decides when and with what message; content comes from the
+  operator's staging. Nothing staged fails honestly - the tree is never
+  swept.
+- **End to end on a real repo:** default ceiling 0 keeps all three inert;
+  raised, each action parks for its own typed token; three tokens typed,
+  a real commit lands on a real `thoth/*` branch - every step an event
+  (`tool.git_*`, `guard.confirmed`).
+
+### Added - the permission table and typed confirmation (2026-10-04)
 - **`thoth permission show|set`**: the operator's `{domain -> level}` table
   (ADR-004 section 5), stored in meta, observe-only by default - a future
   mutating tool ships inert until you deliberately raise its domain. Every

@@ -79,7 +79,7 @@ defense) — lands together with the provider registry, not after.*
       dashboard (`thoth briefing --html` - a file, not a server), zero-typing
       menu on bare `thoth` dispatching real CLI commands; web panel deferred
       to V3+ with its costs on record
-- [ ] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches)
+- [x] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches) *(shipped: three mutating git tools - `git.branch_create` (1), `git.checkout` (1), `git.commit` (2) - behind the guard's ceiling + typed confirmation; the thoth/* rule is tool code, not a prompt, and holds at every ceiling; `git.commit` stages nothing. V1 is closed.)*
 
 ## V2 — memory + content
 

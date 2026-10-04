@@ -1,9 +1,12 @@
 """Tool protocol + registry (ADR-003 §3): declared, leveled, idempotency-flagged.
 
-V0.2 ships exactly three read-only (level 0) tools:
+V0.2 shipped exactly three read-only (level 0) tools:
   shell.read     — allowlisted read-only shell commands
   file.read      — workspace-scoped text file reads
   memory.search  — FTS over notes
+
+V1 adds the first mutating tools - the git branch protocol (gittools.py):
+  git.branch_create, git.checkout, git.commit  (levels 1-2, thoth/* only)
 
 Every tool carries its own deterministic verifier; the runner never trusts the model's
 judgment about whether an action worked.
@@ -357,4 +360,8 @@ def default_registry() -> ToolRegistry:
         required={"query"}, run=_run_memory, verify=_verify_memory,
         summarize=_summarize_memory,
     ))
+    # V1: the git branch protocol - the first mutating tools (levels 1-2).
+    # Lazy import: gittools imports this module's helpers.
+    from .gittools import register as _register_git_tools
+    _register_git_tools(reg)
     return reg

@@ -212,6 +212,31 @@ one run, replays unlock nothing else, and every attempt - grant or
 refusal - lands in the event log. Outside the ceiling the guard denies
 outright. Sensitive-class data is cleared to no tool today.
 
+### The git branch protocol: the first mutating tools (V1)
+
+The registry is six tools now. The three mutating ones are git's:
+`git.branch_create` (level 1), `git.checkout` (1), `git.commit` (2) -
+and they carry one rule as code, not as a prompt: **Thoth works only on
+`thoth/*` branches.** Branch names and checkout targets must match
+`thoth/*`; `git.commit` refuses while on any other branch. The rule
+holds at every ceiling - raising the git level licenses mutations
+inside the protocol, never around it. `git.commit` stages nothing: it
+commits the index as it finds it, so you stage, the run decides when
+and with what message; nothing staged fails honestly.
+
+The default ceiling keeps all three inert. To let a run ship work on a
+branch:
+
+```bash
+thoth permission set git 2       # reversible-write + write for the git domain
+thoth run execute ...            # parks: awaiting typed confirmation ...
+thoth run confirm confirm:16hex  # type the FULL token, once per action
+thoth run resume                 # repeat until the run finishes
+```
+
+Every action is one token, bound to one (run, tool, args); the whole
+trail lands in `thoth log` (`tool.git_*`, `guard.*` events).
+
 ## 4. The eval harness: prove the brain before you trust it
 
 Three tools in escalating order. Prerequisite for all of them: a local server
@@ -286,7 +311,7 @@ the new bytes, rebuild the manifest, amend the decision record.
 ## 5. Verify the install
 
 ```bash
-python -m pytest                # unit + integration suite (210 tests)
+python -m pytest                # unit + integration suite (234 tests)
 python -m evals.run_golden      # 38/38 stored-state questions, DB only
 ```
 
