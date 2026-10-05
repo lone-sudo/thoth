@@ -255,7 +255,17 @@ def _run_file(path: str, workspace: str | None = None, max_chars: int = MAX_OUTP
             escapes = True  # relative_to raises exactly when it escapes
         if escapes:
             return _result(False, "path escapes the workspace", blocked=True)
-        return _result(False, f"not a file in the workspace: {path}",
+        # Honest diagnostics, next increment (locate-family lever, 2026-10-05,
+        # operator-approved): a wrong guess should learn what IS there - the
+        # same fact a human colleague would give. Files only (file.read reads
+        # files), sorted, capped; pure data in a tool result, never an
+        # instruction. Matrix-gated before ship (ADR-006 discipline).
+        try:
+            listing = sorted(p.name for p in ws.iterdir() if p.is_file())[:8]
+        except OSError:
+            listing = []
+        hint = f" (workspace has: {', '.join(listing)})" if listing else ""
+        return _result(False, f"not a file in the workspace: {path}{hint}",
                        blocked=True)
     try:
         text = resolved.read_text(errors="replace")

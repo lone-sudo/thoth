@@ -4,7 +4,21 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - the git branch protocol, the first mutating tools (2026-10-04, latest)
+### Added - the locate gap falls: file.read misses carry the workspace listing (2026-10-05, latest)
+- **Honest diagnostics, next increment:** when `file.read` misses, the
+  error now lists the workspace's real file names (sorted, files only,
+  capped at 8) - data in a tool result, never a prompt instruction.
+  Operator-approved before the instrument changed (ADR-007).
+- **The incumbent passes the model gate for the first time** (ADR-006
+  fourth verdict, 60-episode matrix re-run): qwen2.5-3b now scores
+  json% = tool% = 100% within EVERY goal family - locate went 0% -> 100%
+  tool turns via the guess -> diagnostic -> read -> finish chain; no
+  regressions, 60/60 clean parks. The DEFAULT_MODEL pin keeps its tag and
+  restores its basis: gate-passing, no longer best-available only. What
+  locate measures shifted honestly (reactive recovery, not foresight);
+  any future change to tool failure text re-runs the gate.
+
+### Added - the git branch protocol, the first mutating tools (2026-10-04)
 - **Three mutating git tools behind the permission gate** (`gittools.py`,
   registered into the default registry): `git.branch_create` (level 1),
   `git.checkout` (1), `git.commit` (2). The registry is six tools now.

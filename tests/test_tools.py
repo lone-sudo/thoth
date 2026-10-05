@@ -131,12 +131,46 @@ def test_file_read_reports_missing_files_honestly(registry, workspace):
     spec = registry.get("file.read")
     out = spec.run(path="ghost.txt", workspace=str(ws))
     assert out["ok"] is False and out.get("blocked")
-    assert out["detail"] == "not a file in the workspace: ghost.txt"
+    assert out["detail"].startswith("not a file in the workspace: ghost.txt")
+    # the diagnostic grounds the caller: what IS in the workspace (the
+    # locate-family lever, 2026-10-05, operator-approved; matrix-gated)
+    assert "(workspace has: hello.txt)" in out["detail"]
     v = tools._verify_file(out)
-    assert v.ok is False and v.detail == "not a file in the workspace: ghost.txt"
+    assert v.ok is False and v.detail == out["detail"]
     # a path that merely CONTAINS 'escape-ish' wording still reads honestly
     out2 = spec.run(path="../outside.txt", workspace=str(ws))
     assert "escapes the workspace" in out2["detail"]
+
+
+def test_file_read_miss_diagnostic_lists_files_only_and_caps(registry, tmp_path):
+    """The listing is files-only (file.read reads files), sorted, capped at 8
+    names - data, not an essay."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "draft.md").write_text("x")
+    (ws / "notes").mkdir()
+    (ws / "zz.py").write_text("x")
+    spec = registry.get("file.read")
+    out = spec.run(path="nope.txt", workspace=str(ws))
+    assert "(workspace has: draft.md, zz.py)" in out["detail"]
+    assert "notes" not in out["detail"]  # directories are not readable targets
+
+    many = tmp_path / "many"
+    many.mkdir()
+    for i in range(10):
+        (many / f"f{i}.txt").write_text("x")
+    out2 = spec.run(path="nope.txt", workspace=str(many))
+    detail = out2["detail"]
+    assert detail.count(",") == 7 and "f8.txt" not in detail and "f9.txt" not in detail
+
+
+def test_file_read_miss_without_workspace_dir_is_safe(registry, tmp_path):
+    """A workspace that does not exist degrades to the plain miss message -
+    no crash, no hint."""
+    spec = registry.get("file.read")
+    out = spec.run(path="x.txt", workspace=str(tmp_path / "does-not-exist"))
+    assert out["ok"] is False and out.get("blocked")
+    assert out["detail"] == "not a file in the workspace: x.txt"
 
 
 # ------------------------------------------------------------------ memory.search

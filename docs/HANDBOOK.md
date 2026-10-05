@@ -179,12 +179,13 @@ Either server works, as long as it answers on 127.0.0.1:11434:
 - **llama.cpp (eval path):** `llama-server.exe` (build b11223) serving a GGUF
   on port 11434, used by the eval harness through its shim (section 4).
 
-Which model, honestly: qwen2.5-3b is pinned as **best-available under the $0
-local floor** per the V3+ decision record in `docs/ROADMAP.md` -- perfect on
-the `read` and `memory` goal families, 0% tool turns on the multi-step
-`locate` family. No local candidate passes all three families today.
-Changing the pin re-opens the V3 decision: run the matrix on the candidate
-first, update the record, then the tag.
+Which model, honestly: qwen2.5-3b is pinned as **gate-passing** per the V3+
+decision record in `docs/ROADMAP.md` -- json% = tool% = 100% within EVERY
+goal family (read, memory, locate; fourth verdict, 2026-10-05). The locate
+gap fell to a diagnostic lever the operator approved: when `file.read`
+misses, the error now lists the workspace's real file names, so the planner
+can recover from a wrong guess. Changing the pin OR what tools say on
+failure re-runs the matrix first, then the record, then the tag.
 
 ### The permission table: what a run may touch (ADR-004)
 
@@ -311,7 +312,7 @@ the new bytes, rebuild the manifest, amend the decision record.
 ## 5. Verify the install
 
 ```bash
-python -m pytest                # unit + integration suite (234 tests)
+python -m pytest                # unit + integration suite (236 tests)
 python -m evals.run_golden      # 38/38 stored-state questions, DB only
 ```
 

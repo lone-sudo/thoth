@@ -5,6 +5,10 @@
   Amended 2026-09-30: goal families — the gate generalizes (section 4);
   same day, a third (multi-step) family demoted the incumbent to
   best-available (section 4, third verdict).
+  Amended 2026-10-05: an operator-approved diagnostic lever (file.read
+  misses carry the workspace's file names) re-gated the incumbent —
+  first local candidate to pass all three families (section 4, fourth
+  verdict). The model did not change; the harness did.
 - **Date:** 2026-09-29
 - **Depends on:** ADR-003 (the runner loop: verify-before-checkpoint — tool-turn
   truth comes from the code verifier, never the model), ADR-004 (degradation
@@ -147,6 +151,27 @@ does not ship — and the constant now carries the experiment's provenance so
 it is not silently re-litigated. Conclusion: the locate gap is a reasoning
 limit of the current local floor, not a prompt deficit; the next lever is a
 stronger brain, which stays out of scope by the $0 floor, not by this ADR.
+
+Fourth verdict (2026-10-05, 5 episodes/model/family, 60 episodes): **the
+incumbent passes the gate — json% = tool% = 100% within EVERY family**
+(read 100/100, memory 100/100, locate 100/100 with json 100% [84,100]
+pooled over 16 answers; park_cleanliness 100% across all 60 episodes).
+The lever was **data in a tool result, not an instruction** — the one
+channel the prompt-repair experiment did not touch. Episode evidence from
+the failing baseline: the model guessed `file.read("deploy*")` twice and
+the old miss diagnostic (`not a file in the workspace: deploy*`) carried
+zero grounding, so nothing in the loop could correct it. The operator
+approved the lever explicitly before the instrument changed (sole-decider,
+ADR-007). Honest framing of what locate now measures: discovery is
+*reactive* (guess, read the diagnostic's real file names, read the target)
+rather than purely *foresighted* — a failed-guess-and-recover chain, which
+is itself a real operating skill; the always-list-first skill is no longer
+required to pass. The smaller models did not re-rank: qwen2.5-0.5b stays a
+hollow-finish pretender (tool% 0/0/20, one lucky locate episode), the
+SmolLM2 pair fails on JSON validity, and clean% held at 100% everywhere.
+Consequence: the DEFAULT_MODEL pin stands unchanged on a restored basis —
+**gate-passing**, no longer merely best-available. Any future change to
+what tools say on failure is a harness change and re-runs this gate.
 
 ### 5. The selection is pinned to the record by tests
 

@@ -30,16 +30,17 @@ from urllib.error import URLError  # noqa: F401  (re-exported for tests to patch
 from .guard import Guard, KIND_PROVIDER, PUBLIC
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
-# The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29,
-# amended for the locate family 2026-09-30): Qwen2.5-3B-Instruct remains the
-# pinned brain as BEST-AVAILABLE under the $0 local-only floor — it still
-# passes both single-tool families (read, memory: 100%/100% each) but FAILS
-# the multi-step locate family (json 100%, tool 0%: it guesses filenames
-# instead of listing the directory). The amended gate requires every family,
-# so no local candidate is currently gate-passing; the pin stands on
-# best-available, not on admissibility. Changing this constant re-opens the
-# V3 decision: run the matrix on the new candidate first, then update the
-# decision record, then this tag.
+# The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29;
+# amended for the locate family 2026-09-30; fourth verdict 2026-10-05):
+# Qwen2.5-3B-Instruct is the pinned brain and GATE-PASSING across all three
+# goal families (read, memory, locate: json% = tool% = 100% in every one).
+# The 2026-09-30 demotion to best-available was overturned by the
+# operator-approved diagnostic lever (file.read misses now carry the
+# workspace's real file names - data in a tool result, not a prompt
+# instruction; the matrix re-run passed 60/60 clean parks, locate 5/5 done).
+# The model did not change; the harness did - same pin, restored basis.
+# Changing this constant re-opens the V3 decision: run the matrix on the
+# new candidate first, then update the decision record, then this tag.
 DEFAULT_MODEL = "qwen2.5:3b-instruct"
 _TIMEOUT_S = 60
 

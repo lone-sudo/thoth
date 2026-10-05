@@ -206,3 +206,35 @@ repair (discover-then-act in PLAN_SYSTEM) was measured and reverted the
 same day: locate unchanged, first-ever memory wobble on the incumbent —
 the gap is a reasoning limit, not a prompt or messaging deficit (full
 story in ADR-006).)*
+
+*(Amended 2026-10-05: an operator-approved diagnostic lever re-gated the
+catalog - `file.read` misses now carry the workspace's real file names,
+data in a tool result, not a prompt instruction; the one channel the
+prompt-repair experiment did not touch. Matrix re-run, 5 episodes/model/
+family, 60 episodes, manifest-clean bytes:*
+
+| model         | family |  n |          json% |          tool% |         clean% |        finish% |
+| smollm2-135m  | read   |  5 |     0% [0,28]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | memory |  5 |    11% [2,44]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | locate |  5 |    22% [6,55]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | read   |  5 |    17% [5,45]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | memory |  5 |    11% [2,44]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | locate |  5 |     9% [2,38]  |     20% [4,62] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | read   |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | memory |  5 |  100% [61,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | locate |  5 |  100% [74,100] |     20% [4,62] |  100% [57,100] |     20% [4,62] |
+| qwen2.5-3b    | read   |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | memory |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | locate |  5 |  100% [84,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+
+*Verdict: qwen2.5-3b passes the amended gate for the FIRST time - json% =
+tool% = 100% within EVERY family. Locate went 0% -> 100% tool turns; every
+episode the same recover chain (guess, read the diagnostic's listing, read
+the target, semantic finish). No regressions: clean% 100% across all 60
+episodes; the 0.5b pretender stays hollow (tool% 0/0/20, one lucky locate
+episode), the SmolLM2 pair still fails on JSON. The pin keeps its tag and
+restores its basis: gate-passing, no longer best-available only. What
+locate measures shifted honestly: discovery is now reactive
+(failed-guess-and-recover) instead of purely foresighted - the
+always-list-first skill is no longer required to pass. Full story in
+ADR-006, fourth verdict.)*
