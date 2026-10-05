@@ -31,14 +31,24 @@ from .guard import Guard, KIND_PROVIDER, PUBLIC
 
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
 # The V3 planner brain (decision record in docs/ROADMAP.md, 2026-09-29;
-# amended for the locate family 2026-09-30; fourth verdict 2026-10-05):
+# amended for the locate family 2026-09-30; fourth verdict 2026-10-05;
+# fifth verdict same day):
 # Qwen2.5-3B-Instruct is the pinned brain and GATE-PASSING across all three
 # goal families (read, memory, locate: json% = tool% = 100% in every one).
 # The 2026-09-30 demotion to best-available was overturned by the
 # operator-approved diagnostic lever (file.read misses now carry the
 # workspace's real file names - data in a tool result, not a prompt
 # instruction; the matrix re-run passed 60/60 clean parks, locate 5/5 done).
-# The model did not change; the harness did - same pin, restored basis.
+# Fifth verdict, same day: file.write's menu line alone collapsed locate
+# (90% -> 5% verified turns at n=20, non-overlapping Wilson intervals vs
+# the six-tool control - and the fourth verdict's 100% was an n=5
+# overestimate; the six-tool truth is ~90% [70,97]). Operator decision:
+# the action menu is capability-gated (advertises only tools within the
+# operator's ceiling; the guard stays the authority), and the gate
+# re-passed on the final harness - canonical 60-episode run 100% within
+# every family, n=20 refinement: memory 100% [84,100], locate 90% [70,97].
+# Gate-passing stands on the canonical gate with the locate variance
+# honestly on the record. The model did not change; the harness did.
 # Changing this constant re-opens the V3 decision: run the matrix on the
 # new candidate first, then update the decision record, then this tag.
 DEFAULT_MODEL = "qwen2.5:3b-instruct"

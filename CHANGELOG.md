@@ -4,7 +4,38 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - the locate gap falls: file.read misses carry the workspace listing (2026-10-05, latest)
+### Added - file.write, the AI's first content producer (2026-10-05, latest)
+- **The branch protocol's missing half:** `git.commit` stages nothing by
+  design, so the runner could only commit what the operator staged.
+  `file.write` (filetools.py, seventh tool, level 1) completes the chain:
+  the run creates content, the operator stages it, `git.commit` lands it.
+- **Create-only, in tool code, at every ceiling:** the path must resolve
+  inside the workspace; an existing file is refused ("x" open backs the
+  check against the overwrite race); parent directories must already
+  exist; text only, 64 KiB cap. No overwrite and no delete - those are
+  different tools with higher levels, deliberately unbuilt.
+- **Verifier evidence is disk truth:** the tool reads its own bytes back
+  and the verifier pins the readback; a write whose readback disagrees
+  with the payload fails verify, honestly.
+- **Ships inert, gate governed (ADR-006 fifth verdict):** the file
+  domain's default ceiling is 0, so the tool denies at the guard until
+  the operator raises it and types the per-action token. The registry
+  gained a tool, the planner's action menu gained a line, and the gate
+  re-run FAILED for the first time: locate collapsed (90% -> 5% verified
+  turns at n=20, non-overlapping Wilson intervals vs the six-tool
+  control; json% 100% throughout - protocol intact, action selection
+  broken). The same controlled measurement showed the fourth verdict's
+  locate 100% was an n=5 overestimate (six-tool truth ~90%).
+- **The action menu is now capability-gated (operator decision):** the
+  planner prompt advertises only tools within the operator's
+  {domain -> level} ceiling - level-0 tools always, raising a ceiling
+  reveals its tools, the guard stays the authority. Advertising an
+  unrunnable tool was a hazard in its own right (one hallucinated call
+  parks the run). Gate on the final harness: canonical 60-episode run
+  passes (100% within every family, 60/60 clean parks); n=20 refinement
+  memory 100% [84,100], locate 90% [70,97] - the pre-`file.write` band.
+
+### Added - the locate gap falls: file.read misses carry the workspace listing (2026-10-05)
 - **Honest diagnostics, next increment:** when `file.read` misses, the
   error now lists the workspace's real file names (sorted, files only,
   capped at 8) - data in a tool result, never a prompt instruction.

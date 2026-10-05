@@ -173,6 +173,47 @@ Consequence: the DEFAULT_MODEL pin stands unchanged on a restored basis —
 **gate-passing**, no longer merely best-available. Any future change to
 what tools say on failure is a harness change and re-runs this gate.
 
+Fifth verdict (2026-10-05, same day — the first invocation of that rule):
+**the gate caught a real regression, then governed its own fix.** The
+registry gained `file.write` (the content producer the branch protocol's
+commit path was missing; ships inert at file ceiling 0), which adds one
+line to the planner's action menu — a harness change under the new rule.
+The canonical 60-episode re-run failed for the first time: locate collapsed
+(20% -> 40% -> 0% tool% across three same-day runs while read held 100%
+everywhere). Controlled attribution at n=20, locate family, incumbent
+only: **seven-line menu 5% [1,24] vs six-tool control 90% [70,97]** —
+non-overlapping Wilson intervals; 19/20 failures the identical
+`file.read("deploy")` 3x park, the listing diagnostic ignored, json% 100%
+(protocol adherence intact; the goal-to-action mapping broke). Two
+records fall out of the same measurement: (a) the seventh menu line is
+causally responsible; (b) the FOURTH verdict's 100% locate was an n=5
+overestimate — the six-tool truth is ~90% [70,97] — and n=5 canonical
+cells cannot separate a boundary model from the pass line (same-day
+memory json% swung 20%..100% across identical-instrument runs).
+
+Operator decision (ADR-007; recorded in the transcript): **the action
+menu becomes capability-gated** — it advertises only tools within the
+operator's {domain -> level} ceiling (level-0 tools always; raising a
+ceiling reveals its tools on the next prompt), because advertising an
+unrunnable tool failed twice measured: one hallucinated call parks the
+whole run (domain-ceiling deny), and the perturbation above. The menu is
+presentation, never policy — the guard stays the authority (planner_model
+`_menu_tool_lines`; three pin tests).
+
+Gate verdict on the FINAL harness: **passes the canonical gate**
+(60-episode run: qwen2.5-3b json% = tool% = 100% within EVERY family,
+60/60 clean parks; no candidate re-ranked). n=20 refinement on the
+incumbent: memory 100% [84,100] (20/20), locate 90% [70,97] (18/20) —
+the same band as the six-tool control, i.e. the capability-gated menu
+restores exactly the pre-`file.write` behavior while the tool ships
+inert. The pin keeps its tag: gate-passing on the canonical gate, with
+the locate variance honestly on the record. Rules added: any change to
+what the planner's prompt SURFACE shows (menu lines, descriptions,
+ordering) is a harness change and re-runs this gate; and verdict
+robustness below n=20 is assumed, not measured — the n=20 locate
+refinement is the standing caveat until the operator decides on a
+gate-protocol amendment (open question 5).
+
 ### 5. The selection is pinned to the record by tests
 
 `ollama.DEFAULT_MODEL` (`qwen2.5:3b-instruct`) carries a provenance comment
@@ -278,3 +319,10 @@ this ADR).
    re-runs add value on top of byte-pinning stays open for Team-B.
 4. Should the pin-test mechanism extend to the matrix catalog itself (the
    `MODELS` list pinned to the decision record's table)?
+5. ~~Is the canonical n=5-per-cell gate verdict robust?~~ **measured
+   2026-10-05: no** — the same-day control run failed the fourth verdict's
+   own claim on unchanged bytes (six-tool locate 60% at n=5, 90% at n=20),
+   and memory json% swung 20%..100% across identical-instrument n=5 runs.
+   The n=20 locate refinement is recorded per verdict; whether the gate
+   protocol itself moves to n=20 cells (or a two-run replication rule) is
+   an operator decision — it multiplies gate cost ~4x.

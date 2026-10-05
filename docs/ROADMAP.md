@@ -79,7 +79,7 @@ defense) — lands together with the provider registry, not after.*
       dashboard (`thoth briefing --html` - a file, not a server), zero-typing
       menu on bare `thoth` dispatching real CLI commands; web panel deferred
       to V3+ with its costs on record
-- [x] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches) *(shipped: three mutating git tools - `git.branch_create` (1), `git.checkout` (1), `git.commit` (2) - behind the guard's ceiling + typed confirmation; the thoth/* rule is tool code, not a prompt, and holds at every ceiling; `git.commit` stages nothing. V1 is closed.)*
+- [x] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches) *(shipped: three mutating git tools - `git.branch_create` (1), `git.checkout` (1), `git.commit` (2) - behind the guard's ceiling + typed confirmation; the thoth/* rule is tool code, not a prompt, and holds at every ceiling; `git.commit` stages nothing. V1 is closed. Extended 2026-10-05: `file.write` (1, filetools.py) - the content producer the staging-only commit path was missing; create-only and workspace-scoped in tool code, the verifier pins a byte-for-byte readback; ships inert (file ceiling 0). Its menu line alone collapsed the planner's locate behavior (90% -> 5% verified turns at n=20, non-overlapping Wilson intervals; ADR-006 fifth verdict), so the operator decision re-shaped the harness: the action menu is now capability-gated - it advertises only tools within the operator's ceiling - and the gate re-passed on the final harness.)*
 
 ## V2 — memory + content
 
@@ -238,3 +238,44 @@ locate measures shifted honestly: discovery is now reactive
 (failed-guess-and-recover) instead of purely foresighted - the
 always-list-first skill is no longer required to pass. Full story in
 ADR-006, fourth verdict.)*
+
+*(Amended 2026-10-05 (same day, fifth verdict): `file.write` joined the
+registry - one added menu line - and the canonical 60-episode re-run
+FAILED for the first time. Three same-day runs: locate tool% 20%, 40%,
+0% while read held 100% everywhere. Controlled attribution at n=20
+(locate, incumbent only): seven-line menu 5% [1,24] vs six-tool control
+90% [70,97] - non-overlapping Wilson intervals; 19/20 failures the
+identical `file.read("deploy")` 3x park with the listing diagnostic
+ignored, json% 100% throughout. The same measurement falsified the
+fourth verdict's locate 100% as an n=5 overestimate: the six-tool truth
+is ~90% [70,97]. Operator decision (ADR-007): the action menu is now
+capability-gated - it advertises only tools within the operator's
+{domain -> level} ceiling; level-0 tools always show; the guard stays
+the authority (one hallucinated call to an advertised-but-forbidden
+tool parks the run, so the old menu was a hazard independent of this
+finding). Gate on the FINAL harness:*
+
+| model         | family |  n |          json% |          tool% |         clean% |        finish% |
+| smollm2-135m  | read   |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | memory |  5 |    20% [6,51]  |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-135m  | locate |  5 |    38% [14,69] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | read   |  5 |    31% [13,58] |     60% [23,88] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | memory |  5 |    18% [5,48]  |     20% [4,62] |  100% [57,100] |      0% [0,43] |
+| smollm2-360m  | locate |  5 |    23% [8,50]  |     40% [12,77] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-0.5b  | read   |  5 |  100% [68,100] |     60% [23,88] |  100% [57,100] |     60% [23,88] |
+| qwen2.5-0.5b  | memory |  5 |  100% [70,100] |     40% [12,77] |  100% [57,100] |     40% [12,77] |
+| qwen2.5-0.5b  | locate |  5 |  100% [57,100] |      0% [0,43] |  100% [57,100] |      0% [0,43] |
+| qwen2.5-3b    | read   |  5 |  100% [72,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | memory |  5 |  100% [76,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+| qwen2.5-3b    | locate |  5 |  100% [80,100] |  100% [57,100] |  100% [57,100] |  100% [57,100] |
+
+*Verdict: qwen2.5-3b passes the canonical gate on the FINAL harness -
+json% = tool% = 100% within EVERY family, 60/60 clean parks, no candidate
+re-ranked. n=20 refinement on the incumbent (memory + locate): memory
+100% [84,100] (20/20), locate 90% [70,97] (18/20) - the same band as the
+six-tool control: the capability-gated menu restores exactly the
+pre-`file.write` behavior while the tool ships inert. The pin keeps its
+tag - gate-passing on the canonical gate - with the locate variance
+honestly on the record: single n=5 cells sit at the resolution limit
+(open question 5: n=20 cells or a replication rule, operator's call).
+Full story in ADR-006, fifth verdict.)*

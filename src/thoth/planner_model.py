@@ -26,7 +26,7 @@ import inspect
 import sqlite3
 from typing import Any
 
-from . import ollama, providers
+from . import ollama, permissions, providers
 from .events import emit
 from .runner import PlannerUnavailable, Plan
 from .tools import ToolRegistry
@@ -215,14 +215,37 @@ class ModelPlanner:
             return None  # one probe, no looping: the model said not done
         return None
 
+    def _menu_tool_lines(self) -> list[str]:
+        """The capability-gated action menu (2026-10-05, operator decision).
+
+        The menu advertises only tools the operator's ceiling actually
+        permits: level-0 tools always show; a mutating tool shows only when
+        its domain ceiling >= its level. A tool above the ceiling is
+        unrunnable - the guard would deny it outright - so advertising it
+        failed twice, measured: a single hallucinated call to it parks the
+        whole run (domain-ceiling deny), and the extra menu line itself
+        collapsed the planner's locate behavior (90% -> 5% verified turns,
+        n=20, non-overlapping Wilson intervals; ADR-006 fifth verdict).
+        Raising a ceiling reveals its tools on the next prompt build; the
+        guard stays the authority (the menu is presentation, never policy).
+        """
+        lines: list[str] = []
+        if self._tools is None:
+            return lines
+        for spec in self._tools.all():
+            if spec.permission_level > 0:
+                ceiling = permissions.ceiling(
+                    self._conn, permissions.domain_of(spec.name))
+                if ceiling < spec.permission_level:
+                    continue
+            req = ", ".join(sorted(spec.required)) if spec.required else ""
+            suffix = f" (required args: {req})" if req else ""
+            lines.append(f"- {spec.name}: {spec.description}{suffix}")
+        return lines
+
     def _build_prompt(self, context: str,
                       history: list[dict[str, Any]] | None = None) -> str:
-        tool_lines = []
-        if self._tools is not None:
-            for spec in self._tools.all():
-                req = ", ".join(sorted(spec.required)) if spec.required else ""
-                suffix = f" (required args: {req})" if req else ""
-                tool_lines.append(f"- {spec.name}: {spec.description}{suffix}")
+        tool_lines = self._menu_tool_lines()
         tools_block = "\n".join(tool_lines) if tool_lines else "- (tool list unavailable)"
         out = ["CONTEXT:\n", context, "\n\nTOOL LIST:\n", tools_block]
         if history:

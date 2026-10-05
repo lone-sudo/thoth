@@ -105,7 +105,8 @@ def default_registry() -> ProviderRegistry:
         description="Local models via Ollama — the floor of the ladder; "
                     "default planner brain Qwen2.5-3B-Instruct "
                     "(V3 decision record, matrix-gated; gate-passing across "
-                    "all three goal families, 2026-10-05 amendment)"))
+                    "all three goal families on the capability-gated menu, "
+                    "2026-10-05 fifth verdict)"))
     reg.register(ProviderSpec(
         name="whisper-local", auth_type=AUTH_LOCAL,
         capabilities=frozenset({"transcribe"}),

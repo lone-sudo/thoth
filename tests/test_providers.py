@@ -159,12 +159,13 @@ def test_model_planner_parks_when_all_attempts_fail(conn):
 
 def test_default_planner_model_is_the_v3_decision():
     """The V3 decision record (docs/ROADMAP.md, 2026-09-29; locate amendment
-    2026-09-30; fourth verdict 2026-10-05) keeps Qwen2.5-3B-Instruct as the
-    planner brain — gate-passing again across all THREE goal families after
-    the operator-approved diagnostic lever (file.read misses carry the
-    workspace's file names; the model did not change, the harness did).
-    A new candidate that passes ALL families re-opens V3: run the matrix
-    first, update the record, then this pin."""
+    2026-09-30; fourth and fifth verdicts 2026-10-05) keeps Qwen2.5-3B-Instruct
+    as the planner brain — gate-passing on the canonical gate across all THREE
+    goal families, now on the capability-gated menu (fifth verdict: the
+    seventh menu line collapsed locate 90% -> 5% at n=20; the menu now
+    advertises only tools the operator's ceiling permits). The model did not
+    change, the harness did. A new candidate that passes ALL families
+    re-opens V3: run the matrix first, update the record, then this pin."""
     from thoth import ollama
     assert ollama.DEFAULT_MODEL == "qwen2.5:3b-instruct"
 

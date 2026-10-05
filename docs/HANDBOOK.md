@@ -213,17 +213,35 @@ one run, replays unlock nothing else, and every attempt - grant or
 refusal - lands in the event log. Outside the ceiling the guard denies
 outright. Sensitive-class data is cleared to no tool today.
 
-### The git branch protocol: the first mutating tools (V1)
+### The mutating tools: the git branch protocol + file.write (V1)
 
-The registry is six tools now. The three mutating ones are git's:
+The registry is seven tools now. The three mutating git ones carry one
+rule as code, not as a prompt: **Thoth works only on `thoth/*` branches.**
 `git.branch_create` (level 1), `git.checkout` (1), `git.commit` (2) -
-and they carry one rule as code, not as a prompt: **Thoth works only on
-`thoth/*` branches.** Branch names and checkout targets must match
-`thoth/*`; `git.commit` refuses while on any other branch. The rule
-holds at every ceiling - raising the git level licenses mutations
-inside the protocol, never around it. `git.commit` stages nothing: it
-commits the index as it finds it, so you stage, the run decides when
-and with what message; nothing staged fails honestly.
+branch names and checkout targets must match `thoth/*`; `git.commit`
+refuses while on any other branch. The rule holds at every ceiling -
+raising the git level licenses mutations inside the protocol, never
+around it. `git.commit` stages nothing: it commits the index as it
+finds it, so you stage, the run decides when and with what message;
+nothing staged fails honestly.
+
+`file.write` (level 1, filetools.py) is the content producer the
+protocol's commit path was missing: the run creates a file, you stage
+it, `git.commit` lands it. Create-only in tool code, at every ceiling:
+the path must resolve inside the workspace, an existing file is refused
+(the "x" open backs the check against the overwrite race), parent
+directories must already exist, text only, 64 KiB cap. No overwrite and
+no delete - those are different tools with higher levels, unbuilt by
+design. Verify reads the bytes back off disk and pins the readback.
+
+The planner's action menu is capability-gated: it advertises only tools
+the operator's ceiling actually permits (level-0 tools always; raising
+a ceiling reveals its tools on the next prompt). The menu is
+presentation, never policy - the guard stays the authority. Measured
+reason (ADR-006 fifth verdict): advertising an unrunnable tool both
+parked runs on hallucinated calls and, with one extra menu line,
+collapsed the planner's locate behavior 90% -> 5% verified turns at
+n=20.
 
 The default ceiling keeps all three inert. To let a run ship work on a
 branch:
@@ -312,7 +330,7 @@ the new bytes, rebuild the manifest, amend the decision record.
 ## 5. Verify the install
 
 ```bash
-python -m pytest                # unit + integration suite (236 tests)
+python -m pytest                # unit + integration suite (250 tests)
 python -m evals.run_golden      # 38/38 stored-state questions, DB only
 ```
 

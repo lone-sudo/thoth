@@ -5,8 +5,9 @@ V0.2 shipped exactly three read-only (level 0) tools:
   file.read      — workspace-scoped text file reads
   memory.search  — FTS over notes
 
-V1 adds the first mutating tools - the git branch protocol (gittools.py):
+V1 adds the first mutating tools (gittools.py, filetools.py):
   git.branch_create, git.checkout, git.commit  (levels 1-2, thoth/* only)
+  file.write                                   (level 1, workspace create-only)
 
 Every tool carries its own deterministic verifier; the runner never trusts the model's
 judgment about whether an action worked.
@@ -374,4 +375,8 @@ def default_registry() -> ToolRegistry:
     # Lazy import: gittools imports this module's helpers.
     from .gittools import register as _register_git_tools
     _register_git_tools(reg)
+    # V1: the branch protocol's missing half - a content producer. Level 1,
+    # inert until the operator raises the file ceiling (default 0).
+    from .filetools import register as _register_file_tools
+    _register_file_tools(reg)
     return reg

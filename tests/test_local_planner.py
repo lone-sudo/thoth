@@ -147,3 +147,50 @@ def test_ollama_down_parks(conn, monkeypatch):
     result = runner.execute_run(conn, run_id, ModelPlanner(conn, tool_registry=_tool_registry()),
                                 _tool_registry())
     assert result.status == "parked" and "no provider" in result.reason
+
+
+# ------------------------------------------------- capability-gated menu
+
+def test_menu_hides_tools_above_operator_ceiling(conn):
+    """The action menu advertises only tools the ceiling permits: level-0
+    tools always show; a mutating tool above its domain ceiling is absent -
+    advertising an unrunnable tool parked runs on hallucinated calls and
+    (measured, n=20) collapsed the planner's locate behavior. The menu is
+    presentation, never policy: the guard stays the authority."""
+    from thoth import permissions, tools as tools_mod
+    planner = ModelPlanner(conn, task_class="plan",
+                           tool_registry=tools_mod.default_registry())
+    prompt = planner._build_prompt("CONTEXT", None)
+    for shown in ("- shell.read:", "- file.read:", "- memory.search:"):
+        assert shown in prompt, shown
+    for hidden in ("- file.write:", "- git.branch_create:", "- git.checkout:",
+                   "- git.commit:"):
+        assert hidden not in prompt, hidden
+
+
+def test_menu_reveals_tools_when_ceiling_rises(conn):
+    from thoth import permissions, tools as tools_mod
+    permissions.set_ceiling(conn, "file", 1)
+    permissions.set_ceiling(conn, "git", 2)
+    planner = ModelPlanner(conn, task_class="plan",
+                           tool_registry=tools_mod.default_registry())
+    prompt = planner._build_prompt("CONTEXT", None)
+    for shown in ("- file.write:", "- git.branch_create:",
+                  "- git.checkout:", "- git.commit:"):
+        assert shown in prompt, shown
+
+
+def test_menu_never_shows_anything_above_ceiling(conn):
+    """Belt over braces: for EVERY registered tool, menu presence implies
+    ceiling coverage. Registry grows, menu stays honest automatically."""
+    from thoth import permissions, tools as tools_mod
+    planner = ModelPlanner(conn, task_class="plan",
+                           tool_registry=tools_mod.default_registry())
+    prompt = planner._build_prompt("CONTEXT", None)
+    for spec in tools_mod.default_registry().all():
+        advertised = f"- {spec.name}:" in prompt
+        permitted = (spec.permission_level <= 0 or
+                     permissions.ceiling(
+                         conn, permissions.domain_of(spec.name))
+                     >= spec.permission_level)
+        assert advertised == permitted, spec.name
