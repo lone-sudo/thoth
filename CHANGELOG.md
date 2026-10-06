@@ -4,7 +4,18 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - file.write, the AI's first content producer (2026-10-05, latest)
+### Added - the user guide (2026-10-05, latest)
+- **docs/USER-GUIDE.md, the task-oriented front door:** what the pinned
+  model can and cannot do (the measured numbers from the fifth-verdict
+  gate), the seven-tool surface, the four-layer safety spine, worked
+  walkthroughs (read-only run, file.write end to end, the git protocol),
+  the full command cheat sheet verified against cli.py, and
+  troubleshooting. HANDBOOK.md stays the operator's deep manual; the guide
+  links to it and HANDBOOK links back.
+- Docs only: no tool, planner, or eval code changed; the suite and golden
+  gate are expected unaffected (re-run to confirm).
+
+### Added - file.write, the AI's first content producer (2026-10-05)
 - **The branch protocol's missing half:** `git.commit` stages nothing by
   design, so the runner could only commit what the operator staged.
   `file.write` (filetools.py, seventh tool, level 1) completes the chain:

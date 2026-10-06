@@ -394,6 +394,8 @@ private crontab. Reports then arrive daily with no Thoth process running.
 
 ## 8. Where to read more
 
+- `docs/USER-GUIDE.md` -- the task-oriented front door: what the model can
+  do today and the daily commands.
 - `docs/VISION.md` -- what Thoth is for.
 - `docs/ROADMAP.md` -- sequencing plus the full V3+ decision record with
   every measured table.
