@@ -215,19 +215,19 @@ outright. Sensitive-class data is cleared to no tool today.
 
 ### The mutating tools: the git branch protocol + file.write (V1)
 
-The registry is seven tools now. The three mutating git ones carry one
+The registry is eight tools now. The four mutating git ones carry one
 rule as code, not as a prompt: **Thoth works only on `thoth/*` branches.**
-`git.branch_create` (level 1), `git.checkout` (1), `git.commit` (2) -
+`git.branch_create` (level 1), `git.checkout` (1), `git.add` (1), `git.commit` (2) -
 branch names and checkout targets must match `thoth/*`; `git.commit`
-refuses while on any other branch. The rule holds at every ceiling -
+and `git.add` refuse while on any other branch. The rule holds at every ceiling -
 raising the git level licenses mutations inside the protocol, never
 around it. `git.commit` stages nothing: it commits the index as it
-finds it, so you stage, the run decides when and with what message;
+finds it, so content enters via `git.add`, the run decides when and with what message;
 nothing staged fails honestly.
 
 `file.write` (level 1, filetools.py) is the content producer the
-protocol's commit path was missing: the run creates a file, you stage
-it, `git.commit` lands it. Create-only in tool code, at every ceiling:
+protocol's commit path was missing: the run creates a file, stages it
+with `git.add`, and `git.commit` lands it. Create-only in tool code, at every ceiling:
 the path must resolve inside the workspace, an existing file is refused
 (the "x" open backs the check against the overwrite race), parent
 directories must already exist, text only, 64 KiB cap. No overwrite and
@@ -330,7 +330,7 @@ the new bytes, rebuild the manifest, amend the decision record.
 ## 5. Verify the install
 
 ```bash
-python -m pytest                # unit + integration suite (250 tests)
+python -m pytest                # unit + integration suite (258 tests)
 python -m evals.run_golden      # 38/38 stored-state questions, DB only
 ```
 

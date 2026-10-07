@@ -1,7 +1,8 @@
 # Thoth user guide
 
-Written against the tree at commit 5b5703a (Suite 250, golden 38/38, model
-verdict 5, 2026-10-05). When this file and the code disagree, the code wins
+Written against the tree at 5b5703a as amended 2026-10-07 (git.add, the
+eighth tool; Suite 258, golden 38/38, model verdict 6). When this file and
+the code disagree, the code wins
 and this file is a bug. `thoth --help` and `thoth <command> --help` always
 tell the truth. The deep operator manual - evals, GGUF drift, internals, the
 Telegram runbook - is `docs/HANDBOOK.md`; this file is the task-oriented
@@ -20,7 +21,7 @@ Thoth is a personal AI operating layer that runs entirely on your machine:
   hardware (Ollama in production, llama.cpp server in evals), pinned and
   gate-tested per ADR-006.
 - **Declared tools only.** The model cannot touch your computer except
-  through seven registered tools, and every crossing passes a permission
+  through eight registered tools, and every crossing passes a permission
   gate you control.
 
 It is not a chat bot, not a cloud agent, and not autonomous: every mutating
@@ -35,8 +36,8 @@ action, verifies it, and checkpoints it to the append-only event log. The
 model proposes; code disposes.
 
 Measured on the canonical gate (60-episode matrix over three goal families,
-temperature 0.2, 2026-10-05 verdict 5) plus an n=20 refinement of the same
-instrument, for the pinned brain qwen2.5-3b-instruct:
+temperature 0.2; verdicts 5-6, 2026-10-05/07) plus an n=20 refinement of the
+same instrument, for the pinned brain qwen2.5-3b-instruct:
 
 | Goal family | Example goal | Measured result |
 |---|---|---|
@@ -62,7 +63,7 @@ What is NOT measured and NOT promised:
 - **Unconfirmed mutations.** Even inside a raised ceiling, every mutating
   action parks until you type a token.
 
-## 3. The seven tools
+## 3. The eight tools
 
 | Tool | Domain | Level | Mutating? | What it does |
 |---|---|---|---|---|
@@ -72,6 +73,7 @@ What is NOT measured and NOT promised:
 | file.write | file | 1 | yes | create a NEW text file in the workspace (64 KiB cap) |
 | git.branch_create | git | 1 | yes | create a `thoth/*` branch |
 | git.checkout | git | 1 | yes | check out a `thoth/*` branch |
+| git.add | git | 1 | yes | stage one existing file for the next commit (on `thoth/*` only) |
 | git.commit | git | 2 | yes | commit the index as it finds it (on `thoth/*` only) |
 
 `file.write` is create-only, in tool code, at every ceiling: the path must
@@ -108,7 +110,7 @@ git clone https://github.com/lone-sudo/thoth.git
 cd thoth
 pip install -e .            # stdlib only; installs the `thoth` command
 thoth status                # smoke test; creates ~/.thoth/thoth.db
-python -m pytest            # 250 tests, offline, $0
+python -m pytest            # 258 tests, offline, $0
 python -m evals.run_golden  # 38/38 stored-state questions, DB only
 ```
 
@@ -193,10 +195,10 @@ thoth run start --project demo --goal "Create branch thoth/experiment-1 and chec
 thoth run execute --model         # park -> confirm -> resume, as above
 ```
 
-The tools only ever act on `thoth/*` branches, at every ceiling. For the
-full write-to-landed-commit chain: the run creates the file (7.2), YOU
-stage it (`git add` is yours; there is no staging tool), the run commits
-it (7.3).
+The tools only ever act on `thoth/*` branches, at every ceiling. The
+full write-to-landed-commit chain is one run now: `file.write` creates
+the file (7.2), `git.add` stages it (one file per call), `git.commit`
+lands it (7.3) - five mutating actions, five typed confirmations.
 
 Parked runs are surfaced at the top of `thoth continue`, with the exact
 resume command.

@@ -55,15 +55,18 @@ def test_registry_levels_and_flags():
     reg = tools.default_registry()
     by_name = {t.name: t for t in reg.all()}
     assert set(by_name) >= {"shell.read", "file.read", "memory.search",
-                            "git.branch_create", "git.checkout", "git.commit"}
+                            "git.branch_create", "git.checkout", "git.add",
+                            "git.commit"}
     assert by_name["git.branch_create"].permission_level == 1
     assert by_name["git.checkout"].permission_level == 1
+    assert by_name["git.add"].permission_level == 1
     assert by_name["git.commit"].permission_level == 2
     # honest idempotency: two commits are two commits
     assert by_name["git.commit"].idempotent is False
     assert by_name["git.branch_create"].idempotent is True
     assert by_name["git.checkout"].idempotent is True
-    for name in ("git.branch_create", "git.checkout", "git.commit"):
+    assert by_name["git.add"].idempotent is True
+    for name in ("git.branch_create", "git.checkout", "git.add", "git.commit"):
         assert by_name[name].privacy_floor == guard.PRIVATE
 
 

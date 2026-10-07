@@ -6,7 +6,7 @@ V0.2 shipped exactly three read-only (level 0) tools:
   memory.search  — FTS over notes
 
 V1 adds the first mutating tools (gittools.py, filetools.py):
-  git.branch_create, git.checkout, git.commit  (levels 1-2, thoth/* only)
+  git.branch_create, git.checkout, git.add, git.commit  (levels 1-2, thoth/* only)
   file.write                                   (level 1, workspace create-only)
 
 Every tool carries its own deterministic verifier; the runner never trusts the model's

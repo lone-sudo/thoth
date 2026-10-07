@@ -1,11 +1,12 @@
 """The git branch protocol: Thoth's first real mutating tools (ROADMAP V1).
 
 The protocol, as code - never as a prompt: **the AI works only on
-``thoth/*`` branches.** Three tools carry it:
+``thoth/*`` branches.** Four tools carry it:
 
   git.branch_create  create a branch; the NAME must match thoth/*
   git.checkout       switch branches; the TARGET must match thoth/*
   git.commit         commit the staged index; allowed only while ON a thoth/*
+  git.add            stage one existing file; allowed only while ON a thoth/*
 
 Division of labor (ADR-003 / ADR-004): the guard answers *whether* git may
 be mutated at all - the operator's {domain -> level} ceiling plus one typed
@@ -16,9 +17,11 @@ code, not the model: each tool records repo evidence (branch exists, HEAD
 moved) and its verifier pins that evidence.
 
 ``git.commit`` stages nothing. It commits the index exactly as it finds it:
-the runner decides *when* and *with what message*; the content comes from
-the operator's staging (or a future file-write tool behind its own gate).
-A commit with nothing staged fails honestly - it never sweeps the tree.
+the runner decides *when* and *with what message*; the content enters the
+index through ``git.add`` - one existing file per call, one confirmation -
+which together with ``file.write`` closes a chain the run can drive end to
+end: create, stage, commit. A commit with nothing staged fails honestly -
+it never sweeps the tree.
 """
 
 from __future__ import annotations
@@ -205,6 +208,74 @@ def _summarize_commit(result: dict[str, Any]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# git.add  (level 1, reversible-write: unstaging is the same action back)
+# ---------------------------------------------------------------------------
+
+def _run_add(path: str, repo: str | None = None,
+             _conn: sqlite3.Connection | None = None,
+             **_: Any) -> dict[str, Any]:
+    if not isinstance(path, str) or not path:
+        return _result(False, "path must be a non-empty string", blocked=True)
+    path_obj = Path(repo) if repo else Path.cwd()
+    if not path_obj.is_dir():
+        return _result(False, f"not a directory: {path_obj}", blocked=True)
+    # One existing FILE per call - the staged unit is exactly the unit the
+    # confirmation token named. Directories, globs, and .git internals are
+    # not a model surface; the '--' separator keeps a filename from ever
+    # being read as a git option.
+    try:
+        resolved = (path_obj / path).resolve()
+        resolved.relative_to(path_obj.resolve())
+    except (ValueError, OSError):
+        return _result(False, "path escapes the workspace", blocked=True)
+    if any(part.lower() == ".git" for part in resolved.parts):
+        return _result(False, "refusing to stage git internals (.git)",
+                       blocked=True)
+    if not resolved.is_file():
+        return _result(False, f"not a file in the repo: {path}", blocked=True)
+    branch = _current_branch(path_obj)
+    if branch is None or not is_thoth_branch(branch):
+        return _result(False,
+                       f"branch protocol: stages only on thoth/* branches "
+                       f"(on {branch!r})",
+                       blocked=True)
+    rel = resolved.relative_to(path_obj.resolve()).as_posix()
+    code, _out, git_err = _git_run(path_obj, "add", "--", rel)
+    if code != 0:
+        return _result(False, f"git add failed: {git_err[:200]}")
+    # Index evidence, recorded not claimed: name-only diff of the staged
+    # index must contain exactly what the call staged. An unchanged,
+    # already-committed file stages nothing and verifies False - honestly.
+    staged = _git_run(path_obj, "diff", "--cached", "--name-only")[1]
+    staged_files = [ln for ln in staged.splitlines() if ln.strip()]
+    result = _result(True, f"staged {rel} on {branch}",
+                     path=rel, branch=branch,
+                     staged_matches=(rel in staged_files),
+                     staged_count=len(staged_files), repo=str(path_obj))
+    _emit_tool_event(_conn, "tool.git_add",
+                     {"path": rel, "branch": branch, "ok": True})
+    return result
+
+
+def _verify_add(result: dict[str, Any]) -> VerifyReport:
+    if result.get("blocked"):
+        return VerifyReport(False, str(result.get("detail", "blocked")))
+    if result.get("ok") is True and result.get("staged_matches") is not True:
+        return VerifyReport(False,
+                            f"not in the index after add: {result.get('path')}")
+    ok = result.get("ok") is True and result.get("staged_matches") is True
+    return VerifyReport(ok, f"index holds {result.get('staged_count')} file(s); "
+                            f"{result.get('path')} staged on {result.get('branch')}")
+
+
+def _summarize_add(result: dict[str, Any]) -> str:
+    if result.get("ok") is not True:
+        return f"add failed: {result.get('detail', '')}"
+    return (f"Staged {result.get('path')} on {result.get('branch')} "
+            f"(index: {result.get('staged_count')} file(s))")
+
+
+# ---------------------------------------------------------------------------
 # registration
 # ---------------------------------------------------------------------------
 
@@ -232,4 +303,13 @@ def register(reg: ToolRegistry) -> None:
         input_schema={"message": "str", "repo": "str"}, required={"message"},
         run=_run_commit, verify=_verify_commit,
         summarize=_summarize_commit,
+    ))
+    reg.register(ToolSpec(
+        name="git.add",
+        description=("Stage one existing file for the next commit. Branch "
+                     "protocol: only while on a thoth/* branch; one file "
+                     "per call."),
+        permission_level=1, idempotent=True, privacy_floor=guard.PRIVATE,
+        input_schema={"path": "path", "repo": "str"}, required={"path"},
+        run=_run_add, verify=_verify_add, summarize=_summarize_add,
     ))

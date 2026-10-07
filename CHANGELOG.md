@@ -4,7 +4,32 @@ All notable changes to Thoth. Format based on Keep a Changelog; versions: 0.x.y 
 
 ## [Unreleased]
 
-### Added - the user guide (2026-10-05, latest)
+### Added - git.add, the chain's staging half (2026-10-07, latest)
+- **The write -> stage -> commit chain is one run now:** `git.add`
+  (gittools.py, eighth tool, level 1) stages one existing file per call
+  behind the same gate as the other git tools. The branch protocol holds
+  in tool code: staging is refused while on any non-thoth/* branch, the
+  path must resolve inside the repo (no escapes, no .git internals, no
+  directories, `--` separator so a filename can never be read as a
+  flag), and the verifier pins index truth - the name-only diff of the
+  staged index must contain exactly the staged path. An unchanged,
+  already-committed file stages nothing and verifies False, honestly.
+- **The gate re-passed with zero surface change (ADR-006 sixth
+  verdict):** the tool ships inert behind the git ceiling (default 0),
+  so the capability-gated menu at the gate's default ceilings is
+  byte-identical to the fifth verdict's harness. Canonical 60-episode
+  re-run: qwen2.5-3b json% = tool% = 100% within EVERY family, 60/60
+  clean, no candidate re-ranked; the n=20 caveat (memory 100% [84,100],
+  locate 90% [70,97]) carries over. First registry growth that moved
+  nothing on the gate's menu at defaults.
+- Suite 250 -> 258: registry pins, protocol/scoping refusals, index
+  evidence, unchanged-file honesty, guard inertness, and the
+  five-confirmation e2e chain - file.write -> git.branch_create ->
+  git.checkout -> git.add -> git.commit leaves a real commit on a real
+  thoth/* branch. USER-GUIDE and HANDBOOK document the eight-tool
+  surface and the one-run chain.
+
+### Added - the user guide (2026-10-05)
 - **docs/USER-GUIDE.md, the task-oriented front door:** what the pinned
   model can and cannot do (the measured numbers from the fifth-verdict
   gate), the seven-tool surface, the four-layer safety spine, worked

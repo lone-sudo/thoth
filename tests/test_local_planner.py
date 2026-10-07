@@ -164,7 +164,7 @@ def test_menu_hides_tools_above_operator_ceiling(conn):
     for shown in ("- shell.read:", "- file.read:", "- memory.search:"):
         assert shown in prompt, shown
     for hidden in ("- file.write:", "- git.branch_create:", "- git.checkout:",
-                   "- git.commit:"):
+                   "- git.commit:", "- git.add:"):
         assert hidden not in prompt, hidden
 
 
@@ -176,7 +176,7 @@ def test_menu_reveals_tools_when_ceiling_rises(conn):
                            tool_registry=tools_mod.default_registry())
     prompt = planner._build_prompt("CONTEXT", None)
     for shown in ("- file.write:", "- git.branch_create:",
-                  "- git.checkout:", "- git.commit:"):
+                  "- git.checkout:", "- git.commit:", "- git.add:"):
         assert shown in prompt, shown
 
 

@@ -79,7 +79,7 @@ defense) — lands together with the provider registry, not after.*
       dashboard (`thoth briefing --html` - a file, not a server), zero-typing
       menu on bare `thoth` dispatching real CLI commands; web panel deferred
       to V3+ with its costs on record
-- [x] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches) *(shipped: three mutating git tools - `git.branch_create` (1), `git.checkout` (1), `git.commit` (2) - behind the guard's ceiling + typed confirmation; the thoth/* rule is tool code, not a prompt, and holds at every ceiling; `git.commit` stages nothing. V1 is closed. Extended 2026-10-05: `file.write` (1, filetools.py) - the content producer the staging-only commit path was missing; create-only and workspace-scoped in tool code, the verifier pins a byte-for-byte readback; ships inert (file ceiling 0). Its menu line alone collapsed the planner's locate behavior (90% -> 5% verified turns at n=20, non-overlapping Wilson intervals; ADR-006 fifth verdict), so the operator decision re-shaped the harness: the action menu is now capability-gated - it advertises only tools within the operator's ceiling - and the gate re-passed on the final harness.)*
+- [x] 5–8 tools; git branch protocol (AI works only on `thoth/*` branches) *(shipped: three mutating git tools - `git.branch_create` (1), `git.checkout` (1), `git.commit` (2) - behind the guard's ceiling + typed confirmation; the thoth/* rule is tool code, not a prompt, and holds at every ceiling; `git.commit` stages nothing. V1 is closed. Extended 2026-10-05: `file.write` (1, filetools.py) - the content producer the staging-only commit path was missing; create-only and workspace-scoped in tool code, the verifier pins a byte-for-byte readback; ships inert (file ceiling 0). Its menu line alone collapsed the planner's locate behavior (90% -> 5% verified turns at n=20, non-overlapping Wilson intervals; ADR-006 fifth verdict), so the operator decision re-shaped the harness: the action menu is now capability-gated - it advertises only tools within the operator's ceiling - and the gate re-passed on the final harness. Extended 2026-10-07: `git.add` (1, gittools.py) - the staging half; the write -> stage -> commit chain is run-drivable end to end behind the same gate (sixth verdict: menu unchanged at defaults, canonical re-run passed).)*
 
 ## V2 — memory + content
 
@@ -279,3 +279,17 @@ tag - gate-passing on the canonical gate - with the locate variance
 honestly on the record: single n=5 cells sit at the resolution limit
 (open question 5: n=20 cells or a replication rule, operator's call).
 Full story in ADR-006, fifth verdict.)*
+
+*(Amended 2026-10-07 (sixth verdict): `git.add` (1, gittools) joined the
+registry - the branch protocol's staging half: one existing file per
+call, thoth/* current-branch rule in tool code, the verifier pins the
+name-only index diff - completing the run-drivable chain file.write ->
+git.add -> git.commit (Suite 258, five-confirmation e2e chain test).
+Ships inert behind the git ceiling (default 0), so the capability-gated
+menu at the gate's default ceilings is byte-identical to the fifth
+verdict's harness: the canonical 60-episode re-run PASSED - qwen2.5-3b
+json% = tool% = 100% within EVERY family, 60/60 clean parks, no
+candidate re-ranked. The first registry growth with zero gate-surface
+change at defaults; the n=20 caveat (memory 100% [84,100], locate 90%
+[70,97]) carries over unchanged. Full story in ADR-006, sixth verdict.)*
+

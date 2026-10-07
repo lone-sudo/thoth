@@ -47,6 +47,9 @@ DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
 # operator's ceiling; the guard stays the authority), and the gate
 # re-passed on the final harness - canonical 60-episode run 100% within
 # every family, n=20 refinement: memory 100% [84,100], locate 90% [70,97].
+# Sixth verdict, 2026-10-07: git.add (8th tool, ships inert behind the
+# git ceiling) left the default-ceiling menu byte-identical - canonical
+# 60-episode re-run passed 100% within every family, no re-ranking.
 # Gate-passing stands on the canonical gate with the locate variance
 # honestly on the record. The model did not change; the harness did.
 # Changing this constant re-opens the V3 decision: run the matrix on the

@@ -4,7 +4,7 @@
 That made the branch protocol a closed loop: the runner could commit only what
 the OPERATOR staged. ``file.write`` completes the chain:
 
-    file.write (level 1, this module) -> operator stages -> git.commit (level 2)
+    file.write (level 1, this module) -> git.add (level 1, gittools) -> git.commit (level 2)
 
 Division of labor is unchanged (ADR-003 / ADR-004): the guard answers *whether*
 the file domain may be written at all - the operator's {domain -> level} ceiling

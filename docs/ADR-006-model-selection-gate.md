@@ -9,6 +9,9 @@
   misses carry the workspace's file names) re-gated the incumbent —
   first local candidate to pass all three families (section 4, fourth
   verdict). The model did not change; the harness did.
+  Amended 2026-10-07: git.add joined the registry; the gate re-run
+  passed with the default-ceiling menu unchanged (section 4, sixth
+  verdict).
 - **Date:** 2026-09-29
 - **Depends on:** ADR-003 (the runner loop: verify-before-checkpoint — tool-turn
   truth comes from the code verifier, never the model), ADR-004 (degradation
@@ -213,6 +216,26 @@ ordering) is a harness change and re-runs this gate; and verdict
 robustness below n=20 is assumed, not measured — the n=20 locate
 refinement is the standing caveat until the operator decides on a
 gate-protocol amendment (open question 5).
+
+Sixth verdict (2026-10-07): **the registry grew to eight tools and the
+gate re-passed on an unchanged default-ceiling menu.** `git.add` (level
+1, gittools.py - the branch protocol's staging half: one existing file
+per call, thoth/* current-branch rule in tool code, the verifier pins
+the name-only index diff) joined the registry, completing the
+run-drivable chain file.write -> git.add -> git.commit (Suite 250 ->
+258, including a five-confirmation e2e chain test). The tool ships
+inert behind the git ceiling (default 0), so the capability-gated menu
+at the gate's default ceilings is byte-identical to the fifth verdict's
+final harness - and the canonical 60-episode re-run passed exactly so:
+qwen2.5-3b json% = tool% = 100% within EVERY family, clean% and finish%
+100% across all 60 episodes, no candidate re-ranked (the 0.5b
+hollow-finish profile and the SmolLM2 JSON failures reproduced as
+recorded). The fifth verdict's n=20 caveat carries over unchanged: the
+menu the gate scores did not move, so the standing band (memory 100%
+[84,100], locate 90% [70,97]) remains the incumbent's recorded behavior
+at default ceilings. The first registry growth with ZERO gate-surface
+change at defaults - the capability-gated menu doing exactly the job
+the fifth verdict built it for.
 
 ### 5. The selection is pinned to the record by tests
 
